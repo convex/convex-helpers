@@ -1887,10 +1887,20 @@ export type ZodFromValidatorBase<V extends GenericValidator> =
                               OptionalProperty,
                               any
                             >
-                          ? z.ZodRecord<
-                              ZodFromStringValidator<Key>,
-                              ZodFromValidatorBase<Value>
-                            >
+                          ? // Like the union fallback below, stop when the value is the
+                            // maximally-generic validator type (e.g. while TypeScript
+                            // infers `V` of `convexToZod` from its expected return
+                            // type). Otherwise this recurses into itself, which is
+                            // too deep to typecheck since zod 4.6.6.
+                            [GenericValidator] extends [Value]
+                            ? z.ZodRecord<
+                                ZodFromStringValidator<Key>,
+                                zCore.SomeType
+                              >
+                            : z.ZodRecord<
+                                ZodFromStringValidator<Key>,
+                                ZodFromValidatorBase<Value>
+                              >
                           : // Union: must handle separately cases for 0/1/2+ elements
                             // instead of simply writing it as
                             // V extends VUnion<any, infer Elements extends GenericValidator[], any, any>
