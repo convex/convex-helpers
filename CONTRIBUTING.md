@@ -14,6 +14,12 @@ npm install
 > [!IMPORTANT]
 > Do not run `npm install` in `packages/convex-helpers`: this might cause some dependencies to be installed twice, causing type errors.
 
+The frontend and its Vite config live in `example-ui/`. Run `npm run dev:frontend`
+from the repository root; Vite reads the root `.env.local` for `VITE_CONVEX_URL`.
+To build the frontend, run `npm run build` followed by
+`npx vite build --config example-ui/vite.config.mts`. Frontend hosting should serve
+`example-ui/dist/`.
+
 ## Adding a helper
 
 Adding helpers usually involves:
@@ -35,7 +41,7 @@ Adding helpers usually involves:
 4. [root README.md](./README.md) link in the TOC.
 5. Adding an example of usage in the root of this repo.
    1. convex/fooExample.ts for server-side code
-   1. src/components/FooExample.tsx for client-side code, added in App.tsx
+   1. example-ui/src/components/FooExample.tsx for client-side code, added in App.tsx
 
 6. A [Stack](https://stack.convex.dev) post on it - what problem it solves,
    a blurb on how to use it. Update this README with the link when it's live.

@@ -4,7 +4,7 @@ import {
   usePaginatedQuery,
   useQueries,
 } from "convex-helpers/react/cache";
-import { api } from "../../convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 
 // Composing this with the tanstack-style useQuery:
 import { makeUseQueryWithStatus } from "convex-helpers/react";

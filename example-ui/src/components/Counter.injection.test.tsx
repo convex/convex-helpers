@@ -3,7 +3,7 @@ import { render } from "@testing-library/react";
 import { ConvexReactClientFake } from "../fakeConvexClient/fakeConvexClient";
 import { ConvexProvider } from "convex/react";
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { api } from "../../convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 
 // Keep track of counter values
 let counters: Record<string, number> = {};

@@ -101,13 +101,13 @@ To set these up for yourself:
 
 See the [Stack post on single-flighting](https://stack.convex.dev/throttling-requests-by-single-flighting) for info on a technique to limit client requests.
 
-You'll need the [useSingleFlight.ts](./src/hooks/useSingleFlight.ts) file, or [useLatestValue.ts](./src/hooks/useLatestValue.ts) utilities.
+You'll need the [useSingleFlight.ts](./example-ui/src/hooks/useSingleFlight.ts) file, or [useLatestValue.ts](./example-ui/src/hooks/useLatestValue.ts) utilities.
 
 ## Stable query results via useStableQuery
 
 If you're fine getting stale results from queries when parameters change, check out the [Stack post on useStableQuery](https://stack.convex.dev/help-my-app-is-overreacting).
 
-You'll need the [useStableQuery.ts](./src/hooks/useStableQuery.ts) file.
+You'll need the [useStableQuery.ts](./example-ui/src/hooks/useStableQuery.ts) file.
 
 ## Presence
 
@@ -118,9 +118,9 @@ See the [Stack post on implementing presence](https://stack.convex.dev/presence-
 Related files:
 
 - [presence.ts](./convex/presence.ts) for server-side presence functions. Intended to be modified for your application.
-- [usePresence.ts](./src/hooks/usePresence.ts) for client-side React hooks. Modify to match your server API.
-- (optional)[useTypingIndicator.ts](./src/hooks/useTypingIndicator.ts) for specifically doing typing indicator presence.
-- (optional)[Facepile.tsx](./src/components/Facepile.tsx) for showing a facepile based on presence data. Intended to be used as an example to extend.
+- [usePresence.ts](./example-ui/src/hooks/usePresence.ts) for client-side React hooks. Modify to match your server API.
+- (optional)[useTypingIndicator.ts](./example-ui/src/hooks/useTypingIndicator.ts) for specifically doing typing indicator presence.
+- (optional)[Facepile.tsx](./example-ui/src/components/Facepile.tsx) for showing a facepile based on presence data. Intended to be used as an example to extend.
 
 # 🧑‍🏫 What is Convex?
 

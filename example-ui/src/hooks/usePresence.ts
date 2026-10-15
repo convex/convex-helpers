@@ -1,4 +1,4 @@
-import { api } from "../../convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 import { useQuery, useMutation } from "convex/react";
 import { Value } from "convex/values";
 import { useCallback, useEffect, useState } from "react";

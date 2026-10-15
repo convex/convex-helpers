@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { usePaginatedQuery } from "convex-helpers/react";
 import { useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import type { Doc } from "../../convex/_generated/dataModel";
+import { api } from "../../../convex/_generated/api";
+import type { Doc } from "../../../convex/_generated/dataModel";
 import type { UsePaginatedQueryReturnType } from "convex/react";
 
 // Styles object

@@ -6,20 +6,24 @@ import reactHooks from "eslint-plugin-react-hooks";
 import convexPlugin from "@convex-dev/eslint-plugin";
 
 export default [
-  { files: ["src/**/*.{js,mjs,cjs,ts,tsx}", "convex/**/*.{ts,tsx}"] },
+  {
+    files: ["example-ui/src/**/*.{js,mjs,cjs,ts,tsx}", "convex/**/*.{ts,tsx}"],
+  },
   {
     ignores: [
       "dist/**",
+      "example-ui/dist/**",
       "packages/convex-helpers/dist/**",
       "packages/convex-helpers/generate-exports.mjs",
-      "src/fakeConvexClient/fakeConvexClient.js",
+      "example-ui/src/fakeConvexClient/fakeConvexClient.js",
       "backendHarness.js",
       "test-http-routes.mjs",
       "eslint.config.mjs",
       "convex/vitest.config.mts",
       "setup.cjs",
       "**/_generated/",
-      "vite.config.mts",
+      "example-ui/vite.config.mts",
+      "vitest.config.mts",
       "vitest.workspace.ts",
     ],
   },
@@ -46,9 +50,9 @@ export default [
   ...tseslint.configs.recommended,
   {
     files: [
-      "src/react/**/*.{jsx,tsx}",
-      "src/react/**/*.js",
-      "src/react/**/*.ts",
+      "example-ui/src/react/**/*.{jsx,tsx}",
+      "example-ui/src/react/**/*.js",
+      "example-ui/src/react/**/*.ts",
     ],
     plugins: { react: reactPlugin, "react-hooks": reactHooks },
     settings: {

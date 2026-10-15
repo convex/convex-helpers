@@ -5,7 +5,7 @@ import {
   useSessionPaginatedQuery,
   useSessionQuery,
 } from "convex-helpers/react/sessions";
-import { api } from "../../convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 import { useState } from "react";
 import { useStableQuery } from "../hooks/useStableQuery";
 // import { useLocalStorage } from "usehooks-ts";
