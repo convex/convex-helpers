@@ -11,7 +11,7 @@
     "predev": "convex init && npm run build",
     "format": "prettier --write .",
     "lint": "eslint . && npm run typecheck && prettier --check .",
-    "typecheck": "tsc --noEmit && cd packages/convex-helpers && npm run typecheck",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p convex/tsconfig.json && cd packages/convex-helpers && npm run typecheck",
     "build": "cd packages/convex-helpers && npm run build",
     "clean": "rm -rf packages/convex-helpers/dist packages/convex-helpers/tsconfig.tsbuildinfo",
     "pack": "cd packages/convex-helpers/dist && npm pack --pack-destination ../../..",
