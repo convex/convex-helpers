@@ -732,9 +732,7 @@ export function validate<T extends Validator<any, any, any>>(
           break;
         }
         for (const [k, fieldValidator] of Object.entries(validator.fields)) {
-          const fieldValue = Object.hasOwn(value, k)
-            ? (value as any)[k]
-            : undefined;
+          const fieldValue = hasOwn(value, k) ? (value as any)[k] : undefined;
           valid = validate(fieldValidator, fieldValue, {
             ...opts,
             _pathPrefix: appendPath(opts, k),
@@ -746,7 +744,7 @@ export function validate<T extends Validator<any, any, any>>(
         if (!opts?.allowUnknownFields) {
           for (const k of Object.keys(value)) {
             if (
-              !Object.hasOwn(validator.fields, k) &&
+              !hasOwn(validator.fields, k) &&
               value[k as keyof typeof value] !== undefined
             ) {
               if (opts?.throw) {
@@ -850,7 +848,7 @@ function stripUnknownFields<T extends Validator<any, any, any>>(
     case "object": {
       const result: Infer<T> = {};
       for (const [k, v] of Object.entries(value)) {
-        const fieldValidator = Object.hasOwn(validator.fields, k)
+        const fieldValidator = hasOwn(validator.fields, k)
           ? validator.fields[k]
           : undefined;
         if (fieldValidator !== undefined && v !== undefined) {
@@ -892,6 +890,11 @@ function stripUnknownFields<T extends Validator<any, any, any>>(
       return value as Infer<T>;
     }
   }
+}
+
+// Object.hasOwn needs the ES2022 lib, and Convex projects compile against ES2021.
+function hasOwn(target: object, key: string) {
+  return Object.prototype.hasOwnProperty.call(target, key);
 }
 
 // Assigning to `__proto__` would replace the prototype instead of adding a key.

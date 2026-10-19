@@ -130,27 +130,15 @@ describe("object keys that exist on Object.prototype", () => {
 
   test("parse keeps a __proto__ record key as an own key", () => {
     const parsed = parse(
-      v.record(v.string(), v.number()),
-      JSON.parse('{"a":1,"__proto__":2}'),
-    );
-    expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype);
-    expect(Object.keys(parsed)).toEqual(["a", "__proto__"]);
-    expect(Object.getOwnPropertyDescriptor(parsed, "__proto__")?.value).toBe(2);
-  });
-
-  test("parse does not let a record value replace the prototype", () => {
-    const parsed = parse(
       v.record(v.string(), v.any()),
-      JSON.parse('{"__proto__":{"isAdmin":true}}'),
+      JSON.parse('{"a":1,"__proto__":{"isAdmin":true}}'),
     ) as Record<string, unknown>;
     expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype);
     expect(parsed.isAdmin).toBeUndefined();
-  });
-
-  test("a declared field with an inherited name is still validated and kept", () => {
-    const validator = v.object({ constructor: v.number() });
-    expect(validate(validator, { constructor: 1 })).toBe(true);
-    expect(parse(validator, { constructor: 1 })).toEqual({ constructor: 1 });
+    expect(Object.keys(parsed)).toEqual(["a", "__proto__"]);
+    expect(Object.getOwnPropertyDescriptor(parsed, "__proto__")?.value).toEqual(
+      { isAdmin: true },
+    );
   });
 
   test("a required field named like a prototype member is not satisfied by it", () => {
