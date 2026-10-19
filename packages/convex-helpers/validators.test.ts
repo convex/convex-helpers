@@ -53,6 +53,147 @@ describe("validate with undefined values", () => {
   });
 });
 
+describe("object keys that exist on Object.prototype", () => {
+  const action = v.object({ type: v.literal("intent"), intent: v.number() });
+  const inheritedKeys = ["constructor", "toString", "hasOwnProperty"];
+
+  test.each(inheritedKeys)("validate refuses an extra %s key", (key) => {
+    const value = JSON.parse(`{"type":"intent","intent":1,"${key}":0}`);
+    expect(validate(action, value)).toBe(false);
+    expect(() => validate(action, value, { throw: true })).toThrow();
+  });
+
+  test("validate refuses an extra __proto__ key", () => {
+    const value = JSON.parse(
+      '{"type":"intent","intent":1,"__proto__":{"isAdmin":true}}',
+    );
+    expect(Object.hasOwn(value, "__proto__")).toBe(true);
+    expect(validate(action, value)).toBe(false);
+  });
+
+  test("validate refuses them in nested objects and unions", () => {
+    const nested = v.object({ inner: action });
+    const value = JSON.parse(
+      '{"inner":{"type":"intent","intent":1,"constructor":0}}',
+    );
+    expect(validate(nested, value)).toBe(false);
+    expect(validate(v.union(action, v.null()), value.inner)).toBe(false);
+  });
+
+  test("validate accepts them with allowUnknownFields", () => {
+    const value = JSON.parse(
+      '{"type":"intent","intent":1,"constructor":0,"__proto__":{"isAdmin":true}}',
+    );
+    expect(validate(action, value, { allowUnknownFields: true })).toBe(true);
+  });
+
+  test.each(inheritedKeys)("parse strips an extra %s key", (key) => {
+    const value = JSON.parse(`{"type":"intent","intent":1,"${key}":0}`);
+    const parsed = parse(action, value);
+    expect(parsed).toEqual({ type: "intent", intent: 1 });
+    expect(Object.hasOwn(parsed, key)).toBe(false);
+  });
+
+  test("parse strips an own __proto__ key and keeps Object.prototype", () => {
+    const parsed = parse(
+      action,
+      JSON.parse('{"type":"intent","intent":1,"__proto__":{"isAdmin":true}}'),
+    ) as Record<string, unknown>;
+    expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype);
+    expect(parsed.isAdmin).toBeUndefined();
+    expect(Object.keys(parsed)).toEqual(["type", "intent"]);
+  });
+
+  test("parse strips them in nested objects, arrays and unions", () => {
+    const validator = v.object({
+      inner: action,
+      list: v.array(action),
+      either: v.union(action, v.null()),
+    });
+    const extra = '"constructor":0,"__proto__":{"isAdmin":true}';
+    const item = `{"type":"intent","intent":1,${extra}}`;
+    const parsed = parse(
+      validator,
+      JSON.parse(`{"inner":${item},"list":[${item}],"either":${item}}`),
+    );
+    const expected = { type: "intent", intent: 1 };
+    expect(parsed).toEqual({
+      inner: expected,
+      list: [expected],
+      either: expected,
+    });
+    for (const nested of [parsed.inner, parsed.list[0], parsed.either]) {
+      expect(Object.getPrototypeOf(nested)).toBe(Object.prototype);
+      expect((nested as any).isAdmin).toBeUndefined();
+    }
+  });
+
+  test("parse keeps a __proto__ record key as an own key", () => {
+    const parsed = parse(
+      v.record(v.string(), v.number()),
+      JSON.parse('{"a":1,"__proto__":2}'),
+    );
+    expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype);
+    expect(Object.keys(parsed)).toEqual(["a", "__proto__"]);
+    expect(Object.getOwnPropertyDescriptor(parsed, "__proto__")?.value).toBe(2);
+  });
+
+  test("parse does not let a record value replace the prototype", () => {
+    const parsed = parse(
+      v.record(v.string(), v.any()),
+      JSON.parse('{"__proto__":{"isAdmin":true}}'),
+    ) as Record<string, unknown>;
+    expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype);
+    expect(parsed.isAdmin).toBeUndefined();
+  });
+
+  test("a declared field with an inherited name is still validated and kept", () => {
+    const validator = v.object({ constructor: v.number() });
+    expect(validate(validator, { constructor: 1 })).toBe(true);
+    expect(parse(validator, { constructor: 1 })).toEqual({ constructor: 1 });
+  });
+
+  test("a required field named like a prototype member is not satisfied by it", () => {
+    const validator = v.object({ constructor: v.any() });
+    const empty = JSON.parse("{}");
+    expect(validate(validator, empty)).toBe(false);
+    expect(() => validate(validator, empty, { throw: true })).toThrow(
+      "Validator error for constructor: Expected `any`, got `undefined`",
+    );
+    expect(() => parse(validator, empty)).toThrow(
+      "Validator error for constructor: Expected `any`, got `undefined`",
+    );
+  });
+
+  test("an optional field named like a prototype member may be missing", () => {
+    const validator = v.object({ toString: v.optional(v.string()) });
+    const empty = JSON.parse("{}");
+    expect(validate(validator, empty)).toBe(true);
+    expect(parse(validator, empty)).toEqual({});
+    expect(Object.hasOwn(parse(validator, empty), "toString")).toBe(false);
+  });
+
+  test("own values for fields named like prototype members are validated and kept", () => {
+    const validator = v.object({
+      constructor: v.number(),
+      toString: v.optional(v.string()),
+    });
+    const value = JSON.parse('{"constructor":1,"toString":"x"}');
+    expect(validate(validator, value)).toBe(true);
+    expect(parse(validator, value)).toEqual({ constructor: 1, toString: "x" });
+    expect(validate(validator, { constructor: 1, toString: 2 })).toBe(false);
+  });
+
+  test("a declared __proto__ field is kept as an own key", () => {
+    const validator = v.object({ ["__proto__"]: v.number() });
+    const value = JSON.parse('{"__proto__":1}');
+    expect(validate(validator, value)).toBe(true);
+    const parsed = parse(validator, value);
+    expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(parsed, "__proto__")?.value).toBe(1);
+  });
+});
+
 describe("vRequired", () => {
   test("returns required validator unchanged", () => {
     testVRequired(v.string(), v.string());

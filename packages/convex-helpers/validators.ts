@@ -732,7 +732,10 @@ export function validate<T extends Validator<any, any, any>>(
           break;
         }
         for (const [k, fieldValidator] of Object.entries(validator.fields)) {
-          valid = validate(fieldValidator, (value as any)[k], {
+          const fieldValue = Object.hasOwn(value, k)
+            ? (value as any)[k]
+            : undefined;
+          valid = validate(fieldValidator, fieldValue, {
             ...opts,
             _pathPrefix: appendPath(opts, k),
           });
@@ -743,7 +746,7 @@ export function validate<T extends Validator<any, any, any>>(
         if (!opts?.allowUnknownFields) {
           for (const k of Object.keys(value)) {
             if (
-              validator.fields[k] === undefined &&
+              !Object.hasOwn(validator.fields, k) &&
               value[k as keyof typeof value] !== undefined
             ) {
               if (opts?.throw) {
@@ -847,8 +850,11 @@ function stripUnknownFields<T extends Validator<any, any, any>>(
     case "object": {
       const result: Infer<T> = {};
       for (const [k, v] of Object.entries(value)) {
-        if (validator.fields[k] !== undefined && v !== undefined) {
-          result[k] = stripUnknownFields(validator.fields[k], v);
+        const fieldValidator = Object.hasOwn(validator.fields, k)
+          ? validator.fields[k]
+          : undefined;
+        if (fieldValidator !== undefined && v !== undefined) {
+          defineOwn(result, k, stripUnknownFields(fieldValidator, v));
         }
       }
       return result;
@@ -857,7 +863,7 @@ function stripUnknownFields<T extends Validator<any, any, any>>(
       const result: Infer<T> = {};
       for (const [k, v] of Object.entries(value)) {
         if (v !== undefined) {
-          result[k] = stripUnknownFields(validator.value, v);
+          defineOwn(result, k, stripUnknownFields(validator.value, v));
         }
       }
       return result;
@@ -886,6 +892,16 @@ function stripUnknownFields<T extends Validator<any, any, any>>(
       return value as Infer<T>;
     }
   }
+}
+
+// Assigning to `__proto__` would replace the prototype instead of adding a key.
+function defineOwn(target: object, key: string, value: unknown) {
+  Object.defineProperty(target, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
 }
 
 function appendPath(opts: { _pathPrefix?: string } | undefined, path: string) {
