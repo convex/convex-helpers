@@ -279,7 +279,10 @@ export abstract class QueryStream<
    * the page's cursors point at returned documents, never at filtered-out ones,
    * and the rows scanned after the last returned document are re-scanned by the
    * next page. A page stopped before returning anything continues from the last
-   * row scanned, so its cursor does name a filtered-out document.
+   * row scanned, so its cursor does name a filtered-out document. Refreshes
+   * with a fixed `endCursor` keep their existing checkpoint: if a read limit
+   * stops one early, its `continueCursor` is the last row scanned, which may be
+   * filtered out.
    */
   filterWith(predicate: (doc: T) => Promise<boolean>): QueryStream<T> {
     const order = this.getOrder();
@@ -352,7 +355,9 @@ export abstract class QueryStream<
    * so groups examined after it are re-scanned with a fresh budget on the next
    * page. When a limit stops a page before it returns anything, the page
    * advances past the last group examined, even if that group still has unread
-   * matching items, so those items are skipped.
+   * matching items, so those items are skipped. Refreshes with a fixed
+   * `endCursor` keep their existing checkpoint instead: a limit stops them at
+   * the last row scanned, whether or not it was returned.
    */
   distinct(distinctIndexFields: string[]): QueryStream<T> {
     return new DistinctStream(this, distinctIndexFields);
