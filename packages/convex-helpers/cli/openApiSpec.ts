@@ -34,8 +34,18 @@ export const openApiSpec = new Command("open-api-spec")
       "Get the function spec for your configured project's prod deployment.",
     ).default(undefined),
   )
+  .addOption(
+    new Option(
+      "--timeout <seconds>",
+      "Maximum time in seconds to wait when retrieving the function spec from your Convex deployment.",
+    ).default(120),
+  )
   .action(async (options) => {
-    const content = getFunctionSpec(options.prod, options.inputFile);
+    const content = getFunctionSpec(
+      options.prod,
+      options.inputFile,
+      Number(options.timeout),
+    );
     const baseOutputPath =
       options.outputFile ?? `convex-spec-${Date.now().valueOf()}`;
     const outputPath =

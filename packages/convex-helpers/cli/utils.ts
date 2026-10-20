@@ -22,7 +22,19 @@ export type AnalyzedFunction = {
   returns: ValidatorJSON | null;
 };
 
-export function getFunctionSpec(prod?: boolean, filePath?: string) {
+export function getFunctionSpec(
+  prod?: boolean,
+  filePath?: string,
+  timeoutSeconds: number = 120,
+) {
+  if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) {
+    console.error(
+      chalk.red(
+        `Invalid --timeout value: expected a positive number of seconds.`,
+      ),
+    );
+    process.exit(1);
+  }
   if (filePath && prod) {
     console.error(`To use the prod flag, you can't provide a file path`);
     process.exit(1);
@@ -45,11 +57,25 @@ export function getFunctionSpec(prod?: boolean, filePath?: string) {
       const result = spawnSync(npxCmd, ["convex", "function-spec", ...flags], {
         stdio: ["inherit", outputFd, "pipe"],
         encoding: "utf-8",
+        timeout: timeoutSeconds * 1000,
         ...extraOpts,
       });
 
       fs.closeSync(outputFd);
 
+      if (
+        result.error &&
+        (result.error as NodeJS.ErrnoException).code === "ETIMEDOUT"
+      ) {
+        throw new Error(
+          `Timed out after ${timeoutSeconds}s waiting for \`npx convex function-spec\`. ` +
+            "Check that your deployment is reachable (e.g. `npx convex dev` is running, " +
+            "or pass --prod for your production deployment), or increase --timeout.",
+        );
+      }
+      if (result.error) {
+        throw result.error;
+      }
       if (result.status !== 0) {
         throw new Error(result.stderr || "Failed without error message");
       }
