@@ -274,6 +274,12 @@ export abstract class QueryStream<
    * of documents, the `.paginate()` method will read a lot of documents until
    * it gets as many documents as it wants. If you run into issues with reading
    * too much data, you can pass `maximumRowsRead` to `paginate()`.
+   *
+   * When a read limit stops a page that has returned at least one document,
+   * the page's cursors point at returned documents, never at filtered-out ones,
+   * and the rows scanned after the last returned document are re-scanned by the
+   * next page. A page stopped before returning anything continues from the last
+   * row scanned, so its cursor does name a filtered-out document.
    */
   filterWith(predicate: (doc: T) => Promise<boolean>): QueryStream<T> {
     const order = this.getOrder();
@@ -340,11 +346,13 @@ export abstract class QueryStream<
    *
    * This can be used to perform a loose index scan.
    *
-   * When choosing a new page boundary, a read-limited nonempty page resumes
-   * after its last returned item, retrying later groups with a fresh budget.
-   * An empty page advances past
-   * the last group examined, even if that group has unread matching items.
-   * Read limits apply to the whole page, not separately to each group.
+   * Read limits (`maximumRowsRead` / `maximumBytesRead`) apply to the whole
+   * page, not separately to each group. When a limit stops a page that has
+   * returned at least one item, the page resumes after its last returned item,
+   * so groups examined after it are re-scanned with a fresh budget on the next
+   * page. When a limit stops a page before it returns anything, the page
+   * advances past the last group examined, even if that group still has unread
+   * matching items, so those items are skipped.
    */
   distinct(distinctIndexFields: string[]): QueryStream<T> {
     return new DistinctStream(this, distinctIndexFields);
@@ -415,7 +423,6 @@ export abstract class QueryStream<
     const page: T[] = [];
     const indexKeys: IndexKey[] = [];
     const resultKeys: IndexKey[] = [];
-    let lastResultIndex = -1;
     let hasMore = opts.endCursor && opts.endCursor !== "[]";
     let continueCursor = opts.endCursor ?? "[]";
     const maxBytesToRead = opts.maximumBytesRead;
@@ -428,7 +435,6 @@ export abstract class QueryStream<
       if (doc !== null) {
         page.push(doc);
         resultKeys.push(indexKey);
-        lastResultIndex = indexKeys.length;
       }
       indexKeys.push(indexKey);
       totalBytesRead += bandwidth;
@@ -454,19 +460,11 @@ export abstract class QueryStream<
     let pageStatus: "SplitRecommended" | "SplitRequired" | undefined =
       undefined;
     let splitCursor: IndexKey | undefined = undefined;
-    // Distinct groups need splits at returned representatives. Ordinary
-    // streams can retain their existing midpoint among scanned rows, provided
-    // it does not lie beyond a continuation moved back to the last result.
-    const grouped =
-      resultKeys.length > 0 &&
-      this.getPaginationKey(resultKeys[0]!).length < resultKeys[0]!.length;
-    const splitKeys = grouped ? resultKeys : indexKeys;
-    const splitIndex = Math.min(
-      Math.floor((splitKeys.length - 1) / 2),
-      !grouped && hitLimit && !opts.endCursor && lastResultIndex >= 0
-        ? lastResultIndex
-        : Infinity,
-    );
+    // Split at a returned item whenever there is one, so a nonempty page's
+    // cursors only ever name documents the caller was allowed to see. Only an
+    // empty page falls back to a position among the scanned (filtered) rows.
+    const splitKeys = resultKeys.length > 0 ? resultKeys : indexKeys;
+    const splitIndex = Math.floor((splitKeys.length - 1) / 2);
     if (hitLimit) {
       pageStatus = "SplitRequired";
       splitCursor = splitKeys[splitIndex];

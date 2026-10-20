@@ -219,46 +219,80 @@ describe.each(["asc", "desc"] as const)(
       });
     });
 
-    test("ordinary filtered splits stay inside the returned page", async () => {
-      const t = convexTest(schema, modules);
-      await t.run(async (ctx) => {
-        for (let i = 0; i < 6; i++)
-          await ctx.db.insert("rows", {
-            tenant: "m",
-            group: 0,
-            score: i === 0 ? 0 : direction * i,
+    test.each([
+      // Which scan positions (0-based, in scan order) pass the filter.
+      { matches: [0] },
+      { matches: [3] },
+      { matches: [1, 3] },
+      { matches: [1, 2, 4] },
+    ])(
+      "ordinary filtered pages never expose filtered-out rows: %j",
+      async ({ matches }) => {
+        const t = convexTest(schema, modules);
+        await t.run(async (ctx) => {
+          // Scores 0..5 in scan order, then a trailing match beyond the budget.
+          // Avoid -0, which serializes differently in cursors.
+          for (let i = 0; i < 7; i++)
+            await ctx.db.insert("rows", {
+              tenant: "m",
+              group: 0,
+              score: i === 0 ? 0 : direction * i,
+            });
+          const position = (score: number) => Math.abs(score);
+          const query = stream(ctx.db, schema)
+            .query("rows")
+            .withIndex("tenant_group_score", (q) => q.eq("tenant", "m"))
+            .order(order)
+            .filterWith(
+              async (r) =>
+                matches.includes(position(r.score)) || position(r.score) === 6,
+            );
+          const first = await query.paginate({
+            cursor: null,
+            numItems: 10,
+            maximumRowsRead: 5,
           });
-        const query = stream(ctx.db, schema)
-          .query("rows")
-          .withIndex("tenant_group_score", (q) => q.eq("tenant", "m"))
-          .order(order)
-          .filterWith(async (r) => r.score === 0);
-        const first = await query.paginate({
-          cursor: null,
-          numItems: 10,
-          maximumRowsRead: 5,
+          expect(first.page.map((r) => position(r.score))).toEqual(matches);
+          expect(first.pageStatus).toBe("SplitRequired");
+          const returned = first.page.map((r) => r.score);
+          // Both cursors name returned documents, never filtered-out ones.
+          expect(returned).toContain(JSON.parse(first.continueCursor)[2]);
+          expect(returned).toContain(JSON.parse(first.splitCursor!)[2]);
+          expect(JSON.parse(first.continueCursor)[2]).toBe(returned.at(-1));
+          // The page range reproduces the page, and splitting it is lossless.
+          expect(
+            (
+              await query.paginate({
+                cursor: null,
+                endCursor: first.continueCursor,
+                numItems: 1,
+              })
+            ).page,
+          ).toEqual(first.page);
+          const before = await query.paginate({
+            cursor: null,
+            endCursor: first.splitCursor,
+            numItems: 1,
+          });
+          const after = await query.paginate({
+            cursor: first.splitCursor!,
+            endCursor: first.continueCursor,
+            numItems: 1,
+          });
+          expect([...before.page, ...after.page]).toEqual(first.page);
+          // Rows scanned after the last result are re-scanned by the next page.
+          const next = await query.paginate({
+            cursor: first.continueCursor,
+            numItems: 10,
+            maximumRowsRead: 5,
+          });
+          expect(next.continueCursor).not.toBe(first.continueCursor);
+          expect(next.page.map((r) => position(r.score))).toEqual(
+            matches.at(-1)! + 5 >= 6 ? [6] : [],
+          );
         });
-        expect(first.page.map((r) => r.score)).toEqual([0]);
-        expect(JSON.parse(first.continueCursor)[2]).toBe(0);
-        expect(first.splitCursor).toBe(first.continueCursor);
-        expect(
-          (
-            await query.paginate({
-              cursor: null,
-              endCursor: first.continueCursor,
-              numItems: 1,
-            })
-          ).page,
-        ).toEqual(first.page);
-        const next = await query.paginate({
-          cursor: first.continueCursor,
-          numItems: 10,
-          maximumRowsRead: 5,
-        });
-        expect(next.page).toEqual([]);
-        expect(next.continueCursor).not.toBe(first.continueCursor);
-      });
-    });
+      },
+    );
 
     test("filtering after distinct still examines only the representative", async () => {
       const t = convexTest(schema, modules);

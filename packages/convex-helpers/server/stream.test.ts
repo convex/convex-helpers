@@ -473,8 +473,9 @@ describe("stream", () => {
         { a: 1, b: 4, c: 4 },
       ]);
       expect(limitedPage1.pageStatus).toBe("SplitRequired");
+      // Splits land on a returned document, not the filtered-out [1, 3, 3].
       expect(dropSystemFields(JSON.parse(limitedPage1.splitCursor!))).toEqual([
-        1, 3, 3,
+        1, 4, 4,
       ]);
       expect(dropSystemFields(JSON.parse(limitedPage1.continueCursor))).toEqual(
         [1, 4, 4],
