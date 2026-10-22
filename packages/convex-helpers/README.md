@@ -114,6 +114,59 @@ const myAdminQuery = myQueryBuilder({
 });
 ```
 
+### Composing Custom Functions
+
+You can compose custom functions to build middleware layers. This is useful when
+you want to add validation or enrich the context without duplicating code.
+
+#### composeCtx
+
+Compose a base middleware with a context transformation:
+
+```ts
+import { customCtxAndArgs, composeCtx } from "convex-helpers/server/customFunctions";
+
+// Base middleware with optional staff
+const withDevice = customCtxAndArgs({
+  args: { token: v.string() },
+  input: async (ctx, { token }) => ({
+    ctx: { device, staff: staff || null },
+    args: {},
+  }),
+});
+
+// Composed middleware - requires staff
+const withDeviceAuth = composeCtx(withDevice, (ctx) => {
+  if (!ctx.staff) {
+    throw new ConvexError({ code: "STAFF_LOGIN_REQUIRED" });
+  }
+  return { ...ctx, staff: ctx.staff };
+});
+```
+
+#### composeCtxAndArgs
+
+Compose a base middleware with additional arguments and a context transformation:
+
+```ts
+import { customCtx, composeCtxAndArgs } from "convex-helpers/server/customFunctions";
+
+// Base middleware with user
+const withAuth = customCtx(async (ctx) => {
+  const user = await getAuthUserOrThrow(ctx);
+  return { user };
+});
+
+// Extended middleware with user + branch
+const withBranch = composeCtxAndArgs(withAuth, {
+  args: { orgId: v.id("organizations"), branchId: v.id("branches") },
+  transform: async (ctx, { orgId, branchId }) => {
+    const branch = await getBranchOrThrow(ctx, branchId);
+    return { ...ctx, branch, branchId };
+  },
+});
+```
+
 ## Relationship helpers
 
 Traverse database relationships without all the query boilerplate.

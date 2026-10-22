@@ -203,6 +203,139 @@ export const NoOp = {
 };
 
 /**
+ * Compose a base middleware with a context transformation.
+ *
+ * This is useful when you want to add validation or enrich the context
+ * without changing the arguments the middleware accepts.
+ *
+ * e.g.
+ * ```ts
+ * // Base middleware with optional staff
+ * const withDevice = customCtxAndArgs({
+ *   args: { token: v.string() },
+ *   input: async (ctx, { token }) => ({
+ *     ctx: { device, staff: staff || null },
+ *     args: {},
+ *   }),
+ * });
+ *
+ * // Composed middleware - requires staff
+ * const withDeviceAuth = composeCtx(withDevice, (ctx) => {
+ *   if (!ctx.staff) {
+ *     throw new ConvexError({ code: "STAFF_LOGIN_REQUIRED" });
+ *   }
+ *   return { ...ctx, staff: ctx.staff };
+ * });
+ * ```
+ *
+ * @param base The base middleware to compose from.
+ * @param transform A function that transforms the combined context.
+ * @returns A new Customization with the transformed context.
+ */
+export function composeCtx<
+  Ctx extends Record<string, any>,
+  CustomArgsValidator extends PropertyValidators,
+  CustomCtx extends Record<string, any>,
+  CustomMadeArgs extends Record<string, any>,
+  ExtraArgs extends Record<string, any>,
+  TransformedCtx extends Record<string, any>,
+>(
+  base: Customization<Ctx, CustomArgsValidator, CustomCtx, CustomMadeArgs, ExtraArgs>,
+  transform: (
+    ctx: Ctx & CustomCtx,
+    extra: ExtraArgs,
+  ) => TransformedCtx | Promise<TransformedCtx>,
+): Customization<Ctx, CustomArgsValidator, TransformedCtx, CustomMadeArgs, ExtraArgs> {
+  return {
+    args: base.args,
+    input: async (ctx, args, extra) => {
+      const baseResult = await base.input(ctx, args, extra);
+      const combinedCtx = { ...ctx, ...baseResult.ctx } as Ctx & CustomCtx;
+      const transformedCtx = await transform(combinedCtx, extra);
+      return { ctx: transformedCtx, args: baseResult.args };
+    },
+  };
+}
+
+/**
+ * Compose a base middleware with additional arguments and a context transformation.
+ *
+ * This merges the args validators from the base middleware and the extension,
+ * allowing you to build middleware that requires more arguments than its base.
+ *
+ * e.g.
+ * ```ts
+ * // Base middleware with user
+ * const withAuth = customCtx(async (ctx) => {
+ *   const user = await getAuthUserOrThrow(ctx);
+ *   return { user };
+ * });
+ *
+ * // Extended middleware with user + branch
+ * const withBranch = composeCtxAndArgs(withAuth, {
+ *   args: { orgId: v.id("organizations"), branchId: v.id("branches") },
+ *   transform: async (ctx, { orgId, branchId }) => {
+ *     const branch = await getBranchOrThrow(ctx, branchId);
+ *     return { ...ctx, branch, branchId };
+ *   },
+ * });
+ * ```
+ *
+ * @param base The base middleware to compose from.
+ * @param extension An object with `args` validators and a `transform` function.
+ * @returns A new Customization with merged args and transformed context.
+ */
+export function composeCtxAndArgs<
+  Ctx extends Record<string, any>,
+  CustomArgsValidator extends PropertyValidators,
+  CustomCtx extends Record<string, any>,
+  CustomMadeArgs extends Record<string, any>,
+  ExtraArgs extends Record<string, any>,
+  NewArgsValidator extends PropertyValidators,
+  TransformedCtx extends Record<string, any>,
+>(
+  base: Customization<Ctx, CustomArgsValidator, CustomCtx, CustomMadeArgs, ExtraArgs>,
+  extension: {
+    args: NewArgsValidator;
+    transform: (
+      ctx: Ctx & CustomCtx,
+      args: ObjectType<NewArgsValidator>,
+      extra: ExtraArgs,
+    ) => TransformedCtx | Promise<TransformedCtx>;
+  },
+): Customization<
+  Ctx,
+  CustomArgsValidator & NewArgsValidator,
+  TransformedCtx,
+  CustomMadeArgs,
+  ExtraArgs
+> {
+  return {
+    args: { ...base.args, ...extension.args },
+    input: async (ctx, args, extra) => {
+      const argsRecord = args as Record<string, any>;
+
+      // Extract base args
+      const baseArgKeys = Object.keys(base.args);
+      const baseArgs = Object.fromEntries(
+        baseArgKeys.map((k) => [k, argsRecord[k]]),
+      ) as ObjectType<CustomArgsValidator>;
+
+      // Extract extension args
+      const extArgKeys = Object.keys(extension.args);
+      const extArgs = Object.fromEntries(
+        extArgKeys.map((k) => [k, argsRecord[k]]),
+      ) as ObjectType<NewArgsValidator>;
+
+      const baseResult = await base.input(ctx, baseArgs, extra);
+      const combinedCtx = { ...ctx, ...baseResult.ctx } as Ctx & CustomCtx;
+      const transformedCtx = await extension.transform(combinedCtx, extArgs, extra);
+      return { ctx: transformedCtx, args: baseResult.args };
+    },
+  };
+}
+
+/**
  * customQuery helps define custom behavior on top of `query` or `internalQuery`
  * by passing a function that modifies the ctx and args.
  *
