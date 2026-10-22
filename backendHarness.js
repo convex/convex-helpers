@@ -26,8 +26,8 @@ This command does the following:
 - Runs the tests
 - Tears down the backend
 */
-const http = require("http");
-const { spawn, exec, execSync } = require("child_process");
+import http from "node:http";
+import { spawn, exec, execSync } from "node:child_process";
 
 // Run a command against a fresh local backend, handling setting up and tearing down the backend.
 

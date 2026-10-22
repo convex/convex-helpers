@@ -1,75 +1,280 @@
 {
-  "name": "convex-helpers-base",
-  "private": "true",
-  "description": "Home to [packages](./packages/) to complement the official convex package.",
+  "name": "convex-helpers",
+  "version": "0.1.129",
+  "description": "A collection of useful code to complement the official convex package.",
+  "type": "module",
+  "bin": {
+    "convex-helpers": "./dist/bin.cjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "default": "./dist/browser.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
+    "./validators": {
+      "types": "./dist/validators.d.ts",
+      "default": "./dist/validators.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./standardSchema": {
+      "types": "./dist/standardSchema.d.ts",
+      "default": "./dist/standardSchema.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    },
+    "./react/cache": {
+      "types": "./dist/react/cache.d.ts",
+      "default": "./dist/react/cache.js"
+    },
+    "./react/sessions": {
+      "types": "./dist/react/sessions.d.ts",
+      "default": "./dist/react/sessions.js"
+    },
+    "./react/cache/hooks": {
+      "types": "./dist/react/cache/hooks.d.ts",
+      "default": "./dist/react/cache/hooks.js"
+    },
+    "./react/cache/provider": {
+      "types": "./dist/react/cache/provider.d.ts",
+      "default": "./dist/react/cache/provider.js"
+    },
+    "./server/compare": {
+      "types": "./dist/server/compare.d.ts",
+      "default": "./dist/server/compare.js"
+    },
+    "./server/cors": {
+      "types": "./dist/server/cors.d.ts",
+      "default": "./dist/server/cors.js"
+    },
+    "./server/crud": {
+      "types": "./dist/server/crud.d.ts",
+      "default": "./dist/server/crud.js"
+    },
+    "./server/customFunctions": {
+      "types": "./dist/server/customFunctions.d.ts",
+      "default": "./dist/server/customFunctions.js"
+    },
+    "./server/filter": {
+      "types": "./dist/server/filter.d.ts",
+      "default": "./dist/server/filter.js"
+    },
+    "./server/hono": {
+      "types": "./dist/server/hono.d.ts",
+      "default": "./dist/server/hono.js"
+    },
+    "./server/migrations": {
+      "types": "./dist/server/migrations.d.ts",
+      "default": "./dist/server/migrations.js"
+    },
+    "./server/pagination": {
+      "types": "./dist/server/pagination.d.ts",
+      "default": "./dist/server/pagination.js"
+    },
+    "./server/rateLimit": {
+      "types": "./dist/server/rateLimit.d.ts",
+      "default": "./dist/server/rateLimit.js"
+    },
+    "./server/relationships": {
+      "types": "./dist/server/relationships.d.ts",
+      "default": "./dist/server/relationships.js"
+    },
+    "./server/retries": {
+      "types": "./dist/server/retries.d.ts",
+      "default": "./dist/server/retries.js"
+    },
+    "./server/rowLevelSecurity": {
+      "types": "./dist/server/rowLevelSecurity.d.ts",
+      "default": "./dist/server/rowLevelSecurity.js"
+    },
+    "./server/sessions": {
+      "types": "./dist/server/sessions.d.ts",
+      "default": "./dist/server/sessions.js"
+    },
+    "./server/stream": {
+      "types": "./dist/server/stream.d.ts",
+      "default": "./dist/server/stream.js"
+    },
+    "./server/triggers": {
+      "types": "./dist/server/triggers.d.ts",
+      "default": "./dist/server/triggers.js"
+    },
+    "./server/zod": {
+      "types": "./dist/server/zod.d.ts",
+      "default": "./dist/server/zod.js"
+    },
+    "./server/zod3": {
+      "types": "./dist/server/zod3.d.ts",
+      "default": "./dist/server/zod3.js"
+    },
+    "./server/zod4": {
+      "types": "./dist/server/zod4.d.ts",
+      "default": "./dist/server/zod4.js"
+    },
+    "./react/*.js": {
+      "types": "./dist/react/*.d.ts",
+      "default": "./dist/react/*.js"
+    },
+    "./react/*": {
+      "types": "./dist/react/*.d.ts",
+      "default": "./dist/react/*.js"
+    },
+    "./react/cache/*.js": {
+      "types": "./dist/react/cache/*.d.ts",
+      "default": "./dist/react/cache/*.js"
+    },
+    "./react/cache/*": {
+      "types": "./dist/react/cache/*.d.ts",
+      "default": "./dist/react/cache/*.js"
+    },
+    "./server/*.js": {
+      "types": "./dist/server/*.d.ts",
+      "default": "./dist/server/*.js"
+    },
+    "./server/*": {
+      "types": "./dist/server/*.d.ts",
+      "default": "./dist/server/*.js"
+    }
+  },
   "scripts": {
     "init": "convex dev --until-success",
     "dev": "npm-run-all --parallel --race dev:backend dev:frontend dev:helpers test:watch",
     "dev:backend": "convex dev",
     "dev:frontend": "vite --config example-ui/vite.config.mts",
-    "dev:helpers": "cd packages/convex-helpers && npm run dev",
+    "dev:helpers": "chokidar \"packages/convex-helpers/**/*.ts\" \"packages/convex-helpers/**/*.tsx\" \"packages/convex-helpers/tsconfig.json\" \"tsconfig.build.json\" \"package.json\" -i \"**/*.test.*\" -i \"**/dist/**\" -i \"**/node_modules/**\" -c \"npm run build\"",
     "predev": "convex init && npm run build",
     "format": "prettier --write .",
     "lint": "eslint . && npm run typecheck && prettier --check .",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p convex/tsconfig.json && cd packages/convex-helpers && npm run typecheck",
-    "build": "cd packages/convex-helpers && npm run build",
-    "clean": "rm -rf packages/convex-helpers/dist packages/convex-helpers/tsconfig.tsbuildinfo example-ui/dist",
-    "pack": "cd packages/convex-helpers/dist && npm pack --pack-destination ../../..",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p convex/tsconfig.json && tsc -p packages/convex-helpers/tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json && npm run build:bin",
+    "build:bin": "esbuild packages/convex-helpers/cli/index.ts --bundle --platform=node --external:prettier --format=cjs --outfile=dist/bin.cjs",
+    "clean": "rm -rf dist example-ui/dist",
+    "pack": "npm pack",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
-    "testFunctionsExistingBackend": "just convex deploy && just convex env set IS_TEST true && vitest --config convex/vitest.config.mts --run convex/example.test.ts",
-    "testFunctions": "node backendHarness.js 'npm run testFunctionsExistingBackend'",
-    "arethetypeswrong": "cd packages/convex-helpers/dist && attw $(npm pack) --ignore-rules cjs-resolves-to-esm",
     "alpha": "./publish.sh alpha",
-    "release": "./publish.sh"
+    "release": "./publish.sh",
+    "prepack": "npm run clean && npm run build"
   },
-  "engines": {
-    "npm": ">=11.0.0"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/convex/convex-helpers.git"
   },
-  "dependencies": {
-    "classnames": "^2.3.2",
-    "convex": "1.46.0",
-    "convex-helpers": "file:packages/convex-helpers/dist",
-    "hono": "^4.3.6",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "usehooks-ts": "^3.1.0",
-    "zod": "^4.1",
-    "zod3": "npm:zod@~3.25.0"
+  "keywords": [
+    "convex",
+    "backend",
+    "migrations",
+    "ratelimit",
+    "database",
+    "react"
+  ],
+  "author": "Ian Macartney <ian@convex.dev>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/convex/convex-helpers/issues"
   },
+  "homepage": "https://github.com/convex/convex-helpers#readme",
+  "peerDependencies": {
+    "@standard-schema/spec": "^1.0.0",
+    "convex": "^1.46.0",
+    "hono": "^4.0.5",
+    "react": "^17.0.2 || ^18.0.0 || ^19.0.0",
+    "typescript": "^5.5 || ^6.0.0 || ^7.0.0",
+    "zod": "^3.25.0 || ^4.0.0",
+    "prettier": "^3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@standard-schema/spec": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "typescript": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    },
+    "prettier": {
+      "optional": true
+    }
+  },
+  "files": [
+    "dist",
+    "packages/convex-helpers",
+    "CHANGELOG.md"
+  ],
   "devDependencies": {
-    "@arethetypeswrong/cli": "0.18.5",
     "@convex-dev/eslint-plugin": "5.0.0",
     "@edge-runtime/vm": "5.0.0",
     "@eslint/js": "9.39.5",
     "@redocly/cli": "2.43.3",
     "@standard-schema/spec": "1.1.0",
     "@testing-library/react": "16.3.2",
-    "@typescript/native": "npm:typescript@7.0.2",
     "@types/babel__core": "7.20.5",
     "@types/jest": "30.0.0",
     "@types/node": "24.13.3",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
+    "@typescript/native": "npm:typescript@7.0.2",
     "@vitejs/plugin-react": "6.0.5",
     "@vitest/coverage-v8": "5.0.0",
+    "chalk": "4.1.2",
     "chokidar-cli": "3.0.0",
+    "classnames": "^2.3.2",
+    "commander": "10.0.1",
+    "convex": "1.46.0",
     "convex-test": "0.0.54",
+    "esbuild": "0.27.0",
     "eslint": "9.39.5",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.9.0",
+    "hono": "^4.3.6",
     "jsdom": "30.0.1",
     "npm-run-all2": "9.0.3",
     "pkg-pr-new": "0.0.86",
     "prettier": "3.9.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "typescript-eslint": "8.66.0",
+    "usehooks-ts": "^3.1.0",
     "vite": "8.2.0",
     "vitest": "5.0.0",
     "yaml": "2.9.0",
-    "zod-compare": "3.2.0"
+    "zod": "^4.1",
+    "zod-compare": "3.2.0",
+    "zod3": "npm:zod@~3.25.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "dist/*": [
+        "./dist/*"
+      ],
+      "*": [
+        "./dist/*"
+      ]
+    }
   }
 }

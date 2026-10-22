@@ -2,7 +2,7 @@
 
 `npm i convex-helpers@latest`
 
-**[Changelog](./packages/convex-helpers/CHANGELOG.md)**
+**[Changelog](./CHANGELOG.md)**
 
 A collection of useful code to complement the official packages.
 
