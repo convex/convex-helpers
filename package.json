@@ -167,13 +167,16 @@
     "test:watch": "vitest",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
-    "alpha": "npm run release -- alpha",
+    "alpha": "changeset pre enter alpha",
     "release": "node scripts/release.mjs",
     "prepack": "npm run clean && npm run build",
     "release:prepare": "node scripts/prepare-release.mjs",
     "release:validate": "node scripts/validate-release.mjs",
     "release:check": "npm run clean && npm ci && npm run build && npm run lint && npm test",
-    "test:release": "node --test scripts/*.test.mjs"
+    "test:release": "node --test scripts/*.test.mjs",
+    "changeset": "changeset",
+    "changeset:status": "changeset status",
+    "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts && prettier --write CHANGELOG.md package.json package-lock.json .changeset"
   },
   "repository": {
     "type": "git",
@@ -228,6 +231,7 @@
     "CHANGELOG.md"
   ],
   "devDependencies": {
+    "@changesets/cli": "3.0.3",
     "@convex-dev/eslint-plugin": "5.0.0",
     "@edge-runtime/vm": "5.0.0",
     "@eslint/js": "9.39.5",

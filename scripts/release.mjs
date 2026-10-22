@@ -115,6 +115,7 @@ try {
     "package-lock.json",
     "CHANGELOG.md",
   ]);
+  run("git", ["add", "-A", "--", ".changeset"]);
   run("git", ["commit", "-m", `npm ${version}`]);
   const sha = git("rev-parse", "HEAD");
   console.log(
