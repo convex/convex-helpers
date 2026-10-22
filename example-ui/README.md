@@ -10,10 +10,10 @@ The sections that follow are examples from which you can copy code.
 ## Running the examples:
 
 From the repository root, run `npm i && npm run dev`.
-The root install links the built package from `packages/convex-helpers/dist/`,
-so you can edit the helper sources while using this example app.
+The root package builds into `dist/`, and the examples import it by name.
+You can edit sources in `packages/convex-helpers/` while using this example app.
 It will also run `chokidar` to re-compile convex-helpers on file changes.
-See the [dev script](../packages/convex-helpers/package.json) for details.
+See the [dev script](../package.json) for details.
 
 ## Server-Persisted Session Data
 

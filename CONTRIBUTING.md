@@ -8,40 +8,41 @@ Run the following command in the _root_ of the repository (not `packages/convex-
 npm install
 ```
 
-> [!NOTE]
-> There are two `package.json` files in the repository, one in the root and one in `packages/convex-helpers`. The dependencies in the root are a superset of all dependencies, including dependencies used during development only.
-
-> [!IMPORTANT]
-> Do not run `npm install` in `packages/convex-helpers`: this might cause some dependencies to be installed twice, causing type errors.
-
-The frontend and its Vite config live in `example-ui/`. Run `npm run dev:frontend`
-from the repository root; Vite reads the root `.env.local` for `VITE_CONVEX_URL`.
+The root `package.json` is the publishable package and contains all development
+dependencies. Package sources stay in `packages/convex-helpers/`; `npm run build`
+compiles them directly into root `dist/` and bundles the CLI as `dist/bin.cjs`.
+The examples import `convex-helpers` through the root package's exports, so run
+`npm run build` before typechecking or running tests. `npm run dev` builds first
+and watches the package sources for changes. The frontend and its Vite config live
+in `example-ui/`; Vite loads the repository root's `.env.local` for `VITE_CONVEX_URL`.
 
 ## Adding a helper
 
 Adding helpers usually involves:
 
-1. Adding code (and corresponding .test.ts file) to:
-   - ./server/ if it helps write server-side code (imported in convex/)
-   - ./react/ for client-side code. In the future beyond react/ there can be other framework-specific client-side helpers.
-   - ./ if it's truly generic - can be imported client or server-side
+1. Adding code (and a corresponding `.test.ts` file) under `packages/convex-helpers/`:
+   - `server/` if it helps write server-side code (imported in `convex/`).
+   - `react/` for React client-side code.
+   - The package source root if it can be imported client or server-side.
+2. Adding an explicit entry to `exports` in [the root package.json](./package.json),
+   pointing `types` at `./dist/<path>.d.ts` and `default` at `./dist/<path>.js`.
+   Entrypoints are maintained manually. The build and watcher already include
+   TypeScript files under the package source directory.
+3. Adding usage documentation to the [package README](./README.md).
+4. Adding an example in `convex/fooExample.ts` or `example-ui/src/components/FooExample.tsx`.
+5. Writing a [Stack](https://stack.convex.dev) post explaining the problem and
+   how the helper solves it, then linking it from the README.
 
-2. Adding the file to [the root package.json](./package.json)
-   or
-   in the following places:
-   1. exports in [the npm library package.json](./packages/convex-helpers/package.json)
-      using `node generate-exports.mjs`.
-   2. scripts: Update the `dev:helpers` script if it isn't being included by the existing
-      globs, and the `build` command if it's not included in the `cp` command.
+## Checking the package and examples
 
-3. [package README.md](./packages/convex-helpers/README.md) blurb on how to use it, and a link in the TOC.
-4. [root README.md](./README.md) link in the TOC.
-5. Adding an example of usage in the root of this repo.
-   1. convex/fooExample.ts for server-side code
-   1. example-ui/src/components/FooExample.tsx for client-side code, added in App.tsx
-
-6. A [Stack](https://stack.convex.dev) post on it - what problem it solves,
-   a blurb on how to use it. Update this README with the link when it's live.
+- `npm run build`: compile the library and CLI into `dist/`.
+- `npm run build && npx vite build --config example-ui/vite.config.mts`: build
+  the library and frontend. Frontend hosting should use this command and serve
+  `example-ui/dist/`.
+- `npm run typecheck` and `npm test`: check the package and example usage.
+- `npm pack` (or `npm run pack`): clean, build, and create the publishable tarball
+  from the repository root. The `files` allowlist includes compiled output and
+  package sources for declaration maps; tests and configuration are excluded.
 
 ## Testing the Zod helpers against several Zod versions
 
@@ -60,25 +61,9 @@ for how to add a version or mark known failures.
 
 ## Releasing
 
-Run commands from this folder (root of repo).
+Run `npm run release` for a patch or `npm run alpha` for an alpha release from
+this folder. Stop any running development watcher before releasing.
 
-**NOTE**: make sure you aren't running `npm run dev` anywhere when you're
-publishing to avoid races with re-generating files while publishing.
-
-In general you can run `./publish.sh` to go through the publish workflow, or
-`npm run release` to do a release.
-It will prompt you for a new version. If you've already adjusted the version,
-you can just hit enter.
-
-When it shows the publish preview, ensure the files all look like they're there.
-After you confirm to publish, it will publish to npm, make a git commit,
-tag the commit with the version, and push the current branch & that tag.
-
-### Alpha releases
-
-For alpha releases, you can run `./publish.sh alpha` or `npm run alpha`.
-
-Or run this beforehand to bump the version:
-`npm version prerelease --preid alpha && git add package*`.
-Only use alpha, otherwise npm won't tag it correctly and it might suggest it as
-`convex-helpers@latest` instead of just as `convex-helpers@alpha`.
+The existing `publish.sh` checks and publishes the root package, then commits
+its version and lockfile, tags `npm/<version>`, and pushes. Update the root
+`CHANGELOG.md` before releasing. CI publishing is introduced in a separate PR.

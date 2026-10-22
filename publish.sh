@@ -4,7 +4,6 @@ set -e
 
 npm whoami || npm login
 
-rm -rf packages/convex-helpers/node_modules
 npm run clean
 npm ci
 npm run build
@@ -15,23 +14,21 @@ git diff --exit-code || {
   exit 1
 }
 function cleanup() {
-  git checkout -- :/packages/convex-helpers/package.json
+  git checkout -- package.json package-lock.json
 }
 trap cleanup EXIT
 
-pushd packages/convex-helpers >/dev/null
 if [ "$1" == "alpha" ]; then
-  npm version prerelease --preid alpha
+  npm version prerelease --preid alpha --git-tag-version=false
 else
-  npm version patch
+  npm version patch --git-tag-version=false
 fi
 current=$(npm pkg get version | tr -d '"')
-popd >/dev/null
 
 cat <<EOF
 Test it:
   - Add some example usage to the outer convex-helpers repo.
-  - Run \`npm pack\` in /dist and install it elsewhere from the .tgz file.
+  - Run \`npm pack\` at the repository root and install it elsewhere from the .tgz file.
 EOF
 echo "Latest versions:"
 npm view convex-helpers@latest version
@@ -39,23 +36,18 @@ npm view convex-helpers@alpha version
 
 read -r -p "Enter the new version number (hit enter for $current): " version
 
-pushd packages/convex-helpers >/dev/null
 if [ -n "$version" ]; then
-  npm pkg set version="$version"
+  npm version "$version" --git-tag-version=false --allow-same-version
 else
   version=$current
 fi
 
-cp package.json dist/
-
-cd dist
 if (echo "$version" | grep alpha >/dev/null); then
   npm publish --tag alpha
 else
   npm publish
 fi
-popd >/dev/null
-git add packages/convex-helpers/package.json
+git add package.json package-lock.json
 # If there's nothing to commit, continue
 git commit -m "npm $version" || true
 git tag "npm/$version"
