@@ -61,21 +61,46 @@ for how to add a version or mark known failures.
 
 ## Releasing
 
+Add release notes alongside package changes with `npm run changeset`. Choose the
+bump and describe the user-visible change; docs-only and tooling changes do not
+need a note. Changesets selects the largest pending bump for the next release.
+
 From a clean checkout that includes the latest `origin/main`, run:
 
 ```sh
-npm run release                 # patch; edit the changelog in your Git editor
-npm run release -- minor        # or major / alpha
-npm run release -- --watch      # follow CI and open npm's approval page afterward
+npm run release                 # consume notes, version, commit, push, print links
+npm run release -- --watch      # also follow CI and open npm's approval page
 ```
 
-Stop development watchers first. The command checks the package, updates the root
-version and lockfile with `npm version --git-tag-version=false`, opens
-`CHANGELOG.md` in your Git editor, commits, and pushes `HEAD` to `main`. It can run
-from any branch containing the current main; the push must be a fast-forward and
-permitted by branch protection. A release PR is optional. If branch protection
-requires a PR, run `npm run release:prepare -- patch`, commit the generated files,
-and open a PR instead.
+Stop development watchers first. The command checks the package, uses Changesets
+to update the root version and changelog, synchronizes the lockfile, commits, and
+pushes `HEAD` to `main`. If no notes exist, it prompts to create one in an
+interactive terminal. Noninteractive runs require notes already present. The
+command never creates a local Git tag or publishes from your machine.
+
+It can run from any branch containing the current main; the push must be a
+fast-forward and permitted by branch protection. A release PR is optional. To
+prepare one instead, run `npm run release:prepare`, commit the generated files,
+and open a PR. `npm run version-packages` is the underlying noninteractive
+Changesets version/lockfile operation. There is no release-PR bot or merge queue
+required by this setup.
+
+Release PR checks validate the proposed merge with main. CI also validates the
+actual release commit immediately before staging: unconsumed changesets block a
+release, while notes in subsequent commits do not affect an earlier candidate.
+If new notes land before a prepared release merges, refresh the release's version
+and changelog. This is a freshness check, not a guarantee that every code change
+has a note. Direct `npm version` does not run the Changesets release flow.
+
+### Alpha releases
+
+Run `npm run alpha` to enter Changesets prerelease mode, commit the generated
+`.changeset/pre.json`, then run `npm run release`. Add new changesets for later
+alphas. To promote to stable, run `npm run changeset -- pre exit`, commit that
+state change, then run `npm run release`. Changesets preserves consumed alpha
+notes in `.changeset/pre/` until the stable release incorporates them.
+
+### Following CI and approving
 
 After pushing, the command prints links to that commit's CI checks and your npm
 Staged Packages page. Finding the personal npm link uses `npm whoami`; signing in
