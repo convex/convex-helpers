@@ -107,8 +107,10 @@ repository `convex/convex-helpers`, workflow `release.yml`, with **only staged
 publishing allowed**. Disable direct publishing for the trust relationship and
 remove CI tokens that can bypass human approval. The npm-side restriction keeps
 a rogue workflow change from turning a push into a public release without 2FA.
-The workflow pins npm with staged-publishing support. GitHub Actions also needs
-permission to create `npm/*` tags under the repository's rulesets.
+The workflow uses the npm bundled with the Node version in `.nvmrc`: Node
+24.18.0 includes npm 11.16.0, meeting the npm 11.15.0 minimum for staged
+publishing. GitHub Actions also needs permission to create `npm/*` tags under
+the repository's rulesets.
 
 ### Failures and retries
 

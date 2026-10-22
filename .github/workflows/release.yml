@@ -64,8 +64,6 @@ jobs:
           node-version-file: ".nvmrc"
           registry-url: "https://registry.npmjs.org"
           package-manager-cache: false
-      - name: Install npm with staged publishing support
-        run: npm install --global npm@11.21.1 --ignore-scripts
       - name: Validate, build, and test the release commit
         run: |
           npm ci
