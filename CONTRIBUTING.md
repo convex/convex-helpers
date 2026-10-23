@@ -79,20 +79,26 @@ and open a PR instead.
 
 After pushing, the command prints links to that commit's CI checks and your npm
 Staged Packages page. Finding the personal npm link uses `npm whoami`; signing in
-locally is optional and is not used for CI publishing. `--watch` requires the
-GitHub CLI (`gh`) to be installed and authenticated. It follows only the pushed
-commit's Release workflow and opens the approval page after success. The default
-command returns after pushing and printing links.
+locally is required to discover that link, but is not used for CI publishing.
+`--watch` requires the GitHub CLI (`gh`) to be installed and authenticated. It follows only the pushed
+commit's Release workflow and opens the approval page after success if `npm whoami`
+succeeded. Otherwise, it still watches CI and prints instructions to sign in on
+npmjs.com and open Settings → Staged Packages manually. The default command
+returns after pushing and printing links.
 
 [The release workflow](./.github/workflows/release.yml) discovers version-bump
 commits in each push to main, including releases followed by ordinary commits in
 the same push. Each candidate is validated, built, tested, and staged from its
 exact commit with npm trusted publishing and provenance. Prerelease identifiers
-choose the npm dist-tag (`alpha`, `beta`, etc.); stable versions use `latest`.
+choose the npm dist-tag (`alpha`, `beta`, etc.); identifiers that npm treats as
+version ranges (such as numeric identifiers) use `next`. Stable versions use
+`latest`.
 
-After the push's staging jobs succeed, a separate CI job creates each
-`npm/<version>` at its source commit. It accepts an existing matching tag and
-refuses to move a conflicting tag. **A Git tag means staging succeeded, not that
+Each candidate runs its own staging and tagging jobs through
+[the candidate workflow](./.github/workflows/release-candidate.yml). After its
+staging job succeeds, its tag job creates `npm/<version>` at its source commit,
+even if another candidate in the same push fails. It accepts an existing matching
+tag and refuses to move a conflicting tag. **A Git tag means staging succeeded, not that
 the version is publicly available.** Open
 `https://www.npmjs.com/settings/<your-npm-username>/staged-packages`, review the
 version, and approve with npm 2FA. Alternatively, the staging log prints the ID

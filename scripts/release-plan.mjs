@@ -3,6 +3,7 @@ import { appendFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import semver from "semver";
 
 const git = (...args) =>
   execFileSync("git", args, {
@@ -16,14 +17,28 @@ export function releaseAt(sha) {
   const previous = manifest(`${sha}^1`);
   if (!previous.version || previous.version === current.version)
     return undefined;
+  const version = semver.parse(current.version);
+  // npm's parser accepts a leading v and whitespace; package versions must be
+  // canonical, including any build metadata.
+  const canonical =
+    version &&
+    version.version +
+      (version.build.length ? `+${version.build.join(".")}` : "");
   if (
+    !version ||
     current.name !== "convex-helpers" ||
-    !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([a-zA-Z][a-zA-Z0-9-]*)(?:\.[a-zA-Z0-9-]+)*)?$/.test(
-      current.version,
-    )
+    current.version !== canonical
   ) {
     throw new Error(`Invalid release version or package at ${sha}`);
   }
+  const prerelease = version.prerelease[0];
+  // npm rejects dist-tags that are version ranges (e.g. 1, v1, or x).
+  const distTag =
+    prerelease === undefined
+      ? "latest"
+      : semver.validRange(String(prerelease))
+        ? "next"
+        : String(prerelease);
   const tag = `refs/tags/npm/${current.version}`;
   // Only a missing ref is ignored; never move a tag to another commit.
   const exists = execFileSync(
@@ -36,9 +51,7 @@ export function releaseAt(sha) {
   return {
     sha,
     version: current.version,
-    distTag: current.version.includes("-")
-      ? current.version.split("-").slice(1).join("-").split(".")[0]
-      : "latest",
+    distTag,
   };
 }
 

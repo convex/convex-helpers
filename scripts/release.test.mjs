@@ -186,21 +186,69 @@ test("rejected pushes preserve the release commit for recovery and create no tag
   assert.match(result.stdout, /do not bump again/);
 });
 
-test("watch follows this commit's CI run and opens npm after success", (t) => {
+function watchFixture(t, { fails = false, signedIn = true } = {}) {
   const f = fixture(t);
+  const events = path.join(f.bin, "events");
   f.executable(
     path.join(f.bin, "gh"),
-    '#!/bin/sh\nif [ "$2" = list ]; then echo \'[{"databaseId":123,"url":"https://github.com/convex/convex-helpers/actions/runs/123"}]\'; fi\n',
+    `#!${process.execPath}
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const {execFileSync} = require('node:child_process');
+const args = process.argv.slice(2);
+if (args[0] === 'auth') {
+  assert.deepEqual(args, ['auth', 'status']);
+} else if (args[1] === 'list') {
+  const sha = execFileSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).trim();
+  assert.deepEqual(args, ['run', 'list', '--repo', 'convex/convex-helpers', '--workflow', 'release.yml', '--commit', sha, '--event', 'push', '--json', 'databaseId,url']);
+  console.log(JSON.stringify([{databaseId: 123, url: 'https://github.com/convex/convex-helpers/actions/runs/123'}]));
+} else {
+  assert.deepEqual(args, ['run', 'watch', '123', '--repo', 'convex/convex-helpers', '--exit-status']);
+  fs.appendFileSync(${JSON.stringify(events)}, 'watch 123\\n');
+  process.exit(${fails ? 1 : 0});
+}
+`,
   );
   for (const opener of ["open", "xdg-open", "explorer.exe"])
     f.executable(
       path.join(f.bin, opener),
-      `#!/bin/sh\nprintf '%s' "$1" > '${path.join(f.bin, "opened")}'\n`,
+      `#!${process.execPath}
+require('node:fs').appendFileSync(${JSON.stringify(events)}, 'open ' + process.argv[2] + '\\n');
+`,
     );
+  if (!signedIn) {
+    f.executable(
+      path.join(f.bin, "npm"),
+      `#!/bin/sh\nif [ "$1" = whoami ]; then exit 1; else exec "${process.execPath}" "${process.env.npm_execpath}" "$@"; fi\n`,
+    );
+  }
+  return { ...f, events: () => readFileSync(events, "utf8") };
+}
+
+test("watch follows this commit's CI run and opens npm after success", (t) => {
+  const f = watchFixture(t);
   f.assertReleased("0.1.129", ["--watch"]);
   assert.equal(
-    readFileSync(path.join(f.bin, "opened"), "utf8"),
-    "https://www.npmjs.com/settings/release-tester/staged-packages",
+    f.events(),
+    "watch 123\nopen https://www.npmjs.com/settings/release-tester/staged-packages\n",
+  );
+});
+
+test("failed CI never opens the npm approval page", (t) => {
+  const f = watchFixture(t, { fails: true });
+  const result = f.release(["--watch"]);
+  assert.notEqual(result.status, 0);
+  assert.equal(f.events(), "watch 123\n");
+});
+
+test("watch without local npm authentication prints manual approval instructions", (t) => {
+  const f = watchFixture(t, { signedIn: false });
+  const result = f.release(["--watch"]);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.equal(f.events(), "watch 123\n");
+  assert.match(
+    result.stdout,
+    /sign in at https:\/\/www.npmjs.com and open Settings → Staged Packages/,
   );
 });
 
@@ -257,4 +305,72 @@ test("CI does not release an ordinary push", (t) => {
     ]),
     "[]",
   );
+});
+
+test("release validation requires notes in the current version section", (t) => {
+  const f = fixture(t);
+  // Isolate changelog validation from the pending-changeset guard.
+  rmSync(path.join(f.cwd, ".changeset"), { recursive: true, force: true });
+  const validate = () => f.run("node", ["scripts/validate-release.mjs"]);
+  for (const body of ["", "  \n\t", "- Describe this release."]) {
+    f.write(
+      "CHANGELOG.md",
+      `# Changelog\n\n## 0.1.128\n${body}\n## 0.1.127\n\n- Older notes.\n`,
+    );
+    assert.throws(validate, /Add release notes under ## 0.1.128/);
+  }
+  f.write("CHANGELOG.md", "# Changelog\n\n## 0.1.127\n\n- Older notes.\n");
+  assert.throws(validate, /Add release notes/);
+  f.write(
+    "CHANGELOG.md",
+    "# Changelog\r\n\r\n## 0.1.128\r\n\r\n- Real notes.\r\n\r\n## 0.1.127\r\n\r\n- Describe this release.\r\n",
+  );
+  assert.doesNotThrow(validate);
+});
+
+test("CI validates complete SemVer and chooses npm-compatible dist-tags", (t) => {
+  const f = fixture(t);
+  const plan = (version) => {
+    const pkg = JSON.parse(readFileSync(path.join(f.cwd, "package.json")));
+    pkg.version = version;
+    f.write("package.json", JSON.stringify(pkg));
+    const sha = f.commit();
+    return JSON.parse(
+      f.run("node", [
+        "--input-type=module",
+        "-e",
+        `import {releaseAt} from './scripts/release-plan.mjs'; console.log(JSON.stringify(releaseAt('${sha}')))`,
+      ]),
+    );
+  };
+  for (const version of [
+    "1.2.3-alpha.01",
+    "1.2.3-01",
+    "01.2.3",
+    "1.2.3-alpha..1",
+    "1.2.3+",
+    "v1.2.3",
+    " 1.2.3",
+    "1.2.3\n",
+    null,
+  ]) {
+    assert.throws(() => plan(version), /Invalid release version/);
+    // Ensure the following case still compares against a truthy old version.
+    const pkg = JSON.parse(readFileSync(path.join(f.cwd, "package.json")));
+    pkg.version = "0.1.128";
+    f.write("package.json", JSON.stringify(pkg));
+    f.commit();
+  }
+  for (const [version, distTag] of [
+    ["1.2.3-alpha.0", "alpha"],
+    ["1.2.3-beta-test.1+build.9", "beta-test"],
+    ["1.2.3-0.1", "next"],
+    ["1.2.3-v1", "next"],
+    ["1.2.3-x", "next"],
+    ["1.2.3+build-alpha.001", "latest"],
+  ]) {
+    const result = plan(version);
+    assert.equal(result.version, version);
+    assert.equal(result.distTag, distTag);
+  }
 });

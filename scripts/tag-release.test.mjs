@@ -10,7 +10,7 @@ import { parse } from "yaml";
 // code in that privileged CI job, and without making any GitHub writes in tests.
 const workflow = parse(
   readFileSync(
-    new URL("../.github/workflows/release.yml", import.meta.url),
+    new URL("../.github/workflows/release-candidate.yml", import.meta.url),
     "utf8",
   ),
 );
@@ -87,4 +87,39 @@ test("tag permission failures remain failures", async (t) => {
   const result = await tag(t, undefined, 403);
   assert.notEqual(result.status, 0);
   assert.match(result.error, /Creating tag failed: 403/);
+});
+
+test("each release tags only after its own stage job, with separate credentials", () => {
+  const caller = parse(
+    readFileSync(
+      new URL("../.github/workflows/release.yml", import.meta.url),
+      "utf8",
+    ),
+  );
+  const release = caller.jobs.release;
+  assert.equal(release.uses, "./.github/workflows/release-candidate.yml");
+  assert.equal(release.strategy["fail-fast"], false);
+  assert.equal(
+    release.strategy.matrix.release,
+    "${{ fromJSON(needs.plan.outputs.releases) }}",
+  );
+  assert.equal(release.with.sha, "${{ matrix.release.sha }}");
+  assert.equal(release.with.version, "${{ matrix.release.version }}");
+  assert.equal(workflow.jobs.tag.needs, "stage");
+  assert.equal(
+    workflow.jobs.tag.if,
+    undefined,
+    "tagging must retain the default success() condition",
+  );
+  assert.equal(
+    workflow.jobs.stage.strategy,
+    undefined,
+    "staging is one candidate, not an aggregate matrix",
+  );
+  assert.equal(workflow.jobs.tag.strategy, undefined);
+  assert.deepEqual(workflow.jobs.stage.permissions, {
+    contents: "read",
+    "id-token": "write",
+  });
+  assert.deepEqual(workflow.jobs.tag.permissions, { contents: "write" });
 });
