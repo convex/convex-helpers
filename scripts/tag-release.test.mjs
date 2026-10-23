@@ -105,6 +105,7 @@ test("each release tags only after its own stage job, with separate credentials"
   );
   assert.equal(release.with.sha, "${{ matrix.release.sha }}");
   assert.equal(release.with.version, "${{ matrix.release.version }}");
+  assert.equal(release.with.distTag, "${{ matrix.release.distTag }}");
   assert.equal(workflow.jobs.tag.needs, "stage");
   assert.equal(
     workflow.jobs.tag.if,
