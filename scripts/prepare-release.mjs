@@ -1,48 +1,35 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import process from "node:process";
 
-const args = process.argv.slice(2);
-const bump = args[0] ?? "patch";
-if (args.length > 1 || !["patch", "minor", "major", "alpha"].includes(bump)) {
+if (process.argv.length > 2) {
   throw new Error(
-    "Usage: npm run release -- [patch|minor|major|alpha] [--watch]",
+    "Changesets chooses the version. Run npm run changeset to select a bump; use npm run alpha to enter prerelease mode.",
   );
 }
-execFileSync(
-  "npm",
-  [
-    "version",
-    bump === "alpha" ? "prerelease" : bump,
-    ...(bump === "alpha" ? ["--preid=alpha"] : []),
-    "--git-tag-version=false",
-  ],
-  { stdio: "inherit" },
+const current = JSON.parse(readFileSync("package.json")).version;
+const pending = readdirSync(".changeset").filter(
+  (file) =>
+    file.endsWith(".md") &&
+    !/^(README|AGENTS|CLAUDE|GEMINI)\.md$/i.test(file) &&
+    !file.startsWith("."),
 );
-const { version } = JSON.parse(readFileSync("package.json"));
-let changelog = readFileSync("CHANGELOG.md", "utf8");
-changelog = /^## Unreleased$/m.test(changelog)
-  ? changelog.replace(/^## Unreleased$/m, `## ${version}`)
-  : changelog.replace(
-      /^(# .*\n)/,
-      `$1\n## ${version}\n\n- Describe this release.\n`,
+const pre = existsSync(".changeset/pre.json")
+  ? JSON.parse(readFileSync(".changeset/pre.json"))
+  : undefined;
+if (pending.length === 0 && pre?.mode !== "exit") {
+  if (!process.stdin.isTTY)
+    throw new Error(
+      "No pending release notes. Run npm run changeset before releasing noninteractively.",
     );
-writeFileSync("CHANGELOG.md", changelog);
-// GIT_EDITOR/VISUAL/EDITOR are intentionally shell commands, as with git commit.
-const editor = execFileSync("git", ["var", "GIT_EDITOR"], {
-  encoding: "utf8",
-}).trim();
-execFileSync("sh", ["-c", `${editor} CHANGELOG.md`], { stdio: "inherit" });
-execFileSync(
-  "npm",
-  [
-    "exec",
-    "--",
-    "prettier",
-    "--write",
-    "CHANGELOG.md",
-    "package.json",
-    "package-lock.json",
-  ],
-  { stdio: "inherit" },
-);
+  console.log(
+    "No pending release notes. Describe this release and choose its version bump:",
+  );
+  execFileSync("npm", ["run", "changeset"], { stdio: "inherit" });
+}
+execFileSync("npm", ["run", "version-packages"], { stdio: "inherit" });
+if (JSON.parse(readFileSync("package.json")).version === current) {
+  throw new Error(
+    "No version bump was produced. Add a changeset for convex-helpers before releasing.",
+  );
+}

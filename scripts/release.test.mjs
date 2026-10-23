@@ -18,8 +18,9 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const rootPkg = JSON.parse(readFileSync(path.join(root, "package.json")));
+const changesets = Boolean(rootPkg.devDependencies["@changesets/cli"]);
 
-function fixture(t) {
+function fixture(t, changes = ["patch"]) {
   const temp = mkdtempSync(path.join(tmpdir(), "helpers-release-"));
   t.after(() => rmSync(temp, { recursive: true, force: true }));
   const cwd = path.join(temp, "repo");
@@ -72,6 +73,19 @@ function fixture(t) {
   );
   write("CHANGELOG.md", "# Changelog\n\n## 0.1.128\n\n- Existing history.\n");
   write(".gitignore", "node_modules\n");
+  if (changesets) {
+    mkdirSync(path.join(cwd, ".changeset"));
+    cpSync(
+      path.join(root, ".changeset/config.json"),
+      path.join(cwd, ".changeset/config.json"),
+    );
+    changes.forEach((type, i) =>
+      write(
+        `.changeset/note-${i}.md`,
+        `---\n"convex-helpers": ${type}\n---\n\nRelease note ${i}.\n`,
+      ),
+    );
+  }
   const options = {
     cwd,
     encoding: "utf8",
@@ -148,8 +162,8 @@ function fixture(t) {
 }
 
 test("local release writes changelog/version/lockfile and pushes main without a tag", (t) => {
-  const f = fixture(t);
-  f.assertReleased("0.2.0", ["minor"]);
+  const f = fixture(t, ["patch", "minor"]);
+  f.assertReleased("0.2.0", changesets ? [] : ["minor"]);
 });
 
 test("dirty trees are rejected before versioning", (t) => {
@@ -254,7 +268,20 @@ test("watch without local npm authentication prints manual approval instructions
 
 test("alpha releases keep their prerelease identifier", (t) => {
   const f = fixture(t);
-  f.assertReleased("0.1.129-alpha.0", ["alpha"]);
+  if (changesets) {
+    f.run("npm", ["run", "alpha"]);
+    f.commit();
+    f.assertReleased("0.1.129-alpha.0");
+    f.write(
+      ".changeset/next.md",
+      '---\n"convex-helpers": patch\n---\n\nNext alpha.\n',
+    );
+    f.commit();
+    f.assertReleased("0.1.129-alpha.1");
+    f.run("npm", ["run", "changeset", "--", "pre", "exit"]);
+    f.commit();
+    f.assertReleased("0.1.129");
+  } else f.assertReleased("0.1.129-alpha.0", ["alpha"]);
 });
 
 test("CI uses the release commit even when ordinary commits follow it", (t) => {
@@ -391,4 +418,46 @@ test("CI validates complete SemVer and chooses npm-compatible dist-tags", (t) =>
     assert.equal(result.version, version);
     assert.equal(result.distTag, distTag);
   }
+});
+
+if (changesets)
+  test("no pending notes cannot silently produce a noninteractive release", (t) => {
+    const f = fixture(t, []);
+    assert.notEqual(f.release().status, 0);
+    assert.equal(f.version(), "0.1.128");
+    assert.equal(f.git("status", "--porcelain"), "");
+  });
+
+test("release validation rejects notes ahead of a release but permits notes after it", (t) => {
+  const f = fixture(t);
+  f.assertReleased("0.1.129");
+  const releaseSha = f.git("rev-parse", "HEAD");
+  f.write(
+    ".changeset/later.md",
+    '---\n"convex-helpers": patch\n---\n\nLater feature.\n',
+  );
+  f.commit();
+  assert.throws(
+    () => f.run("npm", ["run", "release:validate"]),
+    /unconsumed changesets/,
+  );
+  // Staging checks out the earlier release commit even if main has newer notes.
+  f.git("checkout", "--quiet", "--detach", releaseSha);
+  f.run("npm", ["run", "release:validate"]);
+});
+
+test("manual staging retries reject commits outside main", (t) => {
+  const f = fixture(t);
+  f.write("branch-only.txt", "not on main\n");
+  const sha = f.commit();
+  assert.throws(
+    () =>
+      f.run("env", [
+        `RELEASE_COMMIT=${sha}`,
+        "GITHUB_OUTPUT=plan.txt",
+        "node",
+        "scripts/release-plan.mjs",
+      ]),
+    /merge-base --is-ancestor/,
+  );
 });
