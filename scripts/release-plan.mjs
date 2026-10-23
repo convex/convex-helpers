@@ -59,12 +59,22 @@ export function releasePlan(before, after) {
   if (!/^[a-f0-9]{40}$/.test(before) || !/^[a-f0-9]{40}$/.test(after))
     throw new Error("Expected full Git commit SHAs");
   git("merge-base", "--is-ancestor", before, after);
-  // A push can contain a release commit followed by ordinary commits, or several releases.
-  return git("rev-list", "--first-parent", "--reverse", `${before}..${after}`)
+  // Find the release commit even when ordinary commits follow it in the push.
+  const releases = git(
+    "rev-list",
+    "--first-parent",
+    "--reverse",
+    `${before}..${after}`,
+  )
     .split("\n")
     .filter(Boolean)
     .map(releaseAt)
     .filter(Boolean);
+  if (releases.length > 1)
+    throw new Error(
+      "Push one release at a time: this push contains multiple version bumps. Use the manual Release workflow with a specific commit to recover.",
+    );
+  return releases[0] ?? null;
 }
 
 if (
@@ -72,19 +82,18 @@ if (
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const requested = process.env.RELEASE_COMMIT;
-  let releases;
+  let release;
   if (requested) {
     if (!/^[a-f0-9]{40}$/.test(requested))
       throw new Error("Use the full SHA of a version-bump commit on main");
     git("merge-base", "--is-ancestor", requested, "origin/main");
-    const release = releaseAt(requested);
+    release = releaseAt(requested);
     if (!release) throw new Error("This commit does not bump the version");
-    releases = [release];
   } else {
-    releases = releasePlan(process.env.BEFORE, process.env.GITHUB_SHA);
+    release = releasePlan(process.env.BEFORE, process.env.GITHUB_SHA);
   }
   appendFileSync(
     process.env.GITHUB_OUTPUT,
-    `releases=${JSON.stringify(releases)}\n`,
+    `release=${JSON.stringify(release)}\n`,
   );
 }

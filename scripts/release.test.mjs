@@ -257,7 +257,7 @@ test("alpha releases keep their prerelease identifier", (t) => {
   f.assertReleased("0.1.129-alpha.0", ["alpha"]);
 });
 
-test("CI discovers every bump in a multi-commit push and uses each exact SHA", (t) => {
+test("CI uses the release commit even when ordinary commits follow it", (t) => {
   const f = fixture(t);
   const bump = (version) => {
     const pkg = JSON.parse(readFileSync(path.join(f.cwd, "package.json")));
@@ -267,9 +267,6 @@ test("CI discovers every bump in a multi-commit push and uses each exact SHA", (
   };
   const first = bump("0.1.129");
   f.write("feature.txt", "after release\n");
-  f.commit();
-  const second = bump("0.1.130-alpha.0");
-  f.write("feature.txt", "later still\n");
   const tip = f.commit();
   const plan = () =>
     JSON.parse(
@@ -279,18 +276,39 @@ test("CI discovers every bump in a multi-commit push and uses each exact SHA", (
         `import {releasePlan} from './scripts/release-plan.mjs'; console.log(JSON.stringify(releasePlan('${f.initial}', '${tip}')))`,
       ]),
     );
-  assert.deepEqual(plan(), [
-    { sha: first, version: "0.1.129", distTag: "latest" },
-    { sha: second, version: "0.1.130-alpha.0", distTag: "alpha" },
-  ]);
+  assert.deepEqual(plan(), {
+    sha: first,
+    version: "0.1.129",
+    distTag: "latest",
+  });
   f.git("tag", "npm/0.1.129", first);
   assert.equal(
-    plan().length,
-    2,
+    plan().sha,
+    first,
     "existing matching tag does not suppress a staging retry",
   );
   f.git("tag", "-f", "npm/0.1.129", tip);
   assert.throws(plan, /already identifies a different commit/);
+});
+
+test("CI rejects multiple version bumps in one push", (t) => {
+  const f = fixture(t);
+  for (const version of ["0.1.129", "0.1.130"]) {
+    const pkg = JSON.parse(readFileSync(path.join(f.cwd, "package.json")));
+    pkg.version = version;
+    f.write("package.json", JSON.stringify(pkg));
+    f.commit();
+  }
+  const tip = f.git("rev-parse", "HEAD");
+  assert.throws(
+    () =>
+      f.run("node", [
+        "--input-type=module",
+        "-e",
+        `import {releasePlan} from './scripts/release-plan.mjs'; releasePlan('${f.initial}', '${tip}')`,
+      ]),
+    /Push one release at a time/,
+  );
 });
 
 test("CI does not release an ordinary push", (t) => {
@@ -303,7 +321,7 @@ test("CI does not release an ordinary push", (t) => {
       "-e",
       `import {releasePlan} from './scripts/release-plan.mjs'; console.log(JSON.stringify(releasePlan('${f.initial}', '${tip}')))`,
     ]),
-    "[]",
+    "null",
   );
 });
 

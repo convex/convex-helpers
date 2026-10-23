@@ -28,7 +28,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      releases: ${{ steps.plan.outputs.releases }}
+      release: ${{ steps.plan.outputs.release }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -39,30 +39,93 @@ jobs:
           node-version-file: ".nvmrc"
           package-manager-cache: false
       - run: npm ci --ignore-scripts
-      - name: Find version-bump commits
+      - name: Find the release commit
         id: plan
         env:
           BEFORE: ${{ github.event.before }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: node scripts/release-plan.mjs
 
-  release:
+  stage:
     needs: plan
-    if: needs.plan.outputs.releases != '[]'
-    strategy:
-      fail-fast: false
-      matrix:
-        release: ${{ fromJSON(needs.plan.outputs.releases) }}
-    name: Release ${{ matrix.release.version }}
-    # Each candidate has its own stage -> tag dependency, so another candidate's
-    # failure cannot block tagging a successfully staged version.
-    # Workflow calls resolve at the caller commit, not from a checked-out workspace.
-    # Keep the syntax supported by actionlint until it supports $/ workflow calls.
-    uses: ./.github/workflows/release-candidate.yml # zizmor: ignore[self-repository]
+    if: needs.plan.outputs.release != 'null'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ fromJSON(needs.plan.outputs.release).sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ".nvmrc"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+      - name: Validate, build, and test the release commit
+        run: |
+          npm ci
+          npm run release:validate
+          npm run build
+          npm run lint
+          npm test
+      - name: Stage on npm
+        env:
+          DIST_TAG: ${{ fromJSON(needs.plan.outputs.release).distTag }}
+          VERSION: ${{ fromJSON(needs.plan.outputs.release).version }}
+          RELEASE_SHA: ${{ fromJSON(needs.plan.outputs.release).sha }}
+        run: |
+          {
+            echo "## convex-helpers@$VERSION"
+            echo "Source: $RELEASE_SHA; npm dist-tag: $DIST_TAG."
+            echo 'After this step succeeds, open Settings → Staged Packages on https://www.npmjs.com and approve with 2FA.'
+            echo 'The log below contains the stage ID to run: npm stage approve <stage-id>.'
+            echo 'The Git tag records successful staging, not approval or publication.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          npm stage publish --provenance --tag "$DIST_TAG"
+
+  tag:
+    needs: [plan, stage]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: write
-      id-token: write
-    with:
-      sha: ${{ matrix.release.sha }}
-      version: ${{ matrix.release.version }}
-      distTag: ${{ matrix.release.distTag }}
+    # No checkout, package scripts, or npm credentials in the job that can write tags.
+    # Re-run failed jobs if tagging fails: successful staging jobs are not repeated.
+    steps:
+      - name: Create the tag without moving an existing tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ fromJSON(needs.plan.outputs.release).version }}
+          RELEASE_SHA: ${{ fromJSON(needs.plan.outputs.release).sha }}
+        run: |
+          node --input-type=module <<'JS'
+          const { GH_TOKEN, GITHUB_API_URL, GITHUB_REPOSITORY, VERSION, RELEASE_SHA } = process.env;
+          const root = `${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/git`;
+          const headers = { Authorization: `Bearer ${GH_TOKEN}`, Accept: 'application/vnd.github+json' };
+          const url = `${root}/ref/tags/npm/${VERSION}`;
+          const check = async () => {
+            const response = await fetch(url, { headers });
+            if (response.status === 404) return false;
+            if (!response.ok) throw new Error(`Reading tag failed: ${response.status}`);
+            let { object } = await response.json();
+            // Accept existing annotated tags only when they resolve to the same commit.
+            for (let depth = 0; object.type === 'tag' && depth < 10; depth++) {
+              const tag = await fetch(`${root}/tags/${object.sha}`, { headers });
+              if (!tag.ok) throw new Error(`Reading annotated tag failed: ${tag.status}`);
+              ({ object } = await tag.json());
+            }
+            if (object.type !== 'commit' || object.sha !== RELEASE_SHA) throw new Error('Existing tag points elsewhere; refusing to move it');
+            return true;
+          };
+          if (!await check()) {
+            const response = await fetch(`${root}/refs`, {
+              method: 'POST', headers,
+              body: JSON.stringify({ ref: `refs/tags/npm/${VERSION}`, sha: RELEASE_SHA }),
+            });
+            if (!response.ok && !await check()) throw new Error(`Creating tag failed: ${response.status}`);
+          }
+          console.log(`npm/${VERSION} identifies staged commit ${RELEASE_SHA}. npm approval is still required.`);
+          JS

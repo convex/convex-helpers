@@ -10,7 +10,7 @@ import { parse } from "yaml";
 // code in that privileged CI job, and without making any GitHub writes in tests.
 const workflow = parse(
   readFileSync(
-    new URL("../.github/workflows/release-candidate.yml", import.meta.url),
+    new URL("../.github/workflows/release.yml", import.meta.url),
     "utf8",
   ),
 );
@@ -89,24 +89,25 @@ test("tag permission failures remain failures", async (t) => {
   assert.match(result.error, /Creating tag failed: 403/);
 });
 
-test("each release tags only after its own stage job, with separate credentials", () => {
-  const caller = parse(
-    readFileSync(
-      new URL("../.github/workflows/release.yml", import.meta.url),
-      "utf8",
-    ),
-  );
-  const release = caller.jobs.release;
-  assert.equal(release.uses, "./.github/workflows/release-candidate.yml");
-  assert.equal(release.strategy["fail-fast"], false);
+test("release jobs use the planned commit and channel with separate credentials", () => {
+  const { stage, tag } = workflow.jobs;
+  assert.equal(stage.if, "needs.plan.outputs.release != 'null'");
   assert.equal(
-    release.strategy.matrix.release,
-    "${{ fromJSON(needs.plan.outputs.releases) }}",
+    stage.steps[0].with.ref,
+    "${{ fromJSON(needs.plan.outputs.release).sha }}",
   );
-  assert.equal(release.with.sha, "${{ matrix.release.sha }}");
-  assert.equal(release.with.version, "${{ matrix.release.version }}");
-  assert.equal(release.with.distTag, "${{ matrix.release.distTag }}");
-  assert.equal(workflow.jobs.tag.needs, "stage");
+  const upload = stage.steps.find((step) => step.name === "Stage on npm");
+  assert.equal(
+    upload.env.DIST_TAG,
+    "${{ fromJSON(needs.plan.outputs.release).distTag }}",
+  );
+  assert.equal(
+    upload.env.VERSION,
+    "${{ fromJSON(needs.plan.outputs.release).version }}",
+  );
+  assert.equal(tag.steps[0].env.VERSION, upload.env.VERSION);
+  assert.equal(tag.steps[0].env.RELEASE_SHA, stage.steps[0].with.ref);
+  assert.deepEqual(tag.needs, ["plan", "stage"]);
   assert.equal(
     workflow.jobs.tag.if,
     undefined,

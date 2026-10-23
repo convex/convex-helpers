@@ -86,20 +86,19 @@ succeeded. Otherwise, it still watches CI and prints instructions to sign in on
 npmjs.com and open Settings → Staged Packages manually. The default command
 returns after pushing and printing links.
 
-[The release workflow](./.github/workflows/release.yml) discovers version-bump
-commits in each push to main, including releases followed by ordinary commits in
-the same push. Each candidate is validated, built, tested, and staged from its
+[The release workflow](./.github/workflows/release.yml) finds the version-bump
+commit in each push to main, including a release followed by ordinary commits in
+the same push. Push one release at a time; multiple version bumps in one push
+are rejected. The release is validated, built, tested, and staged from its
 exact commit with npm trusted publishing and provenance. Prerelease identifiers
 choose the npm dist-tag (`alpha`, `beta`, etc.); identifiers that npm treats as
 version ranges (such as numeric identifiers) use `next`. Stable versions use
 `latest`.
 
-Each candidate runs its own staging and tagging jobs through
-[the candidate workflow](./.github/workflows/release-candidate.yml). After its
-staging job succeeds, its tag job creates `npm/<version>` at its source commit,
-even if another candidate in the same push fails. It accepts an existing matching
-tag and refuses to move a conflicting tag. **A Git tag means staging succeeded, not that
-the version is publicly available.** Open
+After staging succeeds, a separate tag job creates `npm/<version>` at the release
+commit. It accepts an existing matching tag and refuses to move a conflicting
+tag. **A Git tag means staging succeeded, not that the version is publicly
+available.** Open
 `https://www.npmjs.com/settings/<your-npm-username>/staged-packages`, review the
 version, and approve with npm 2FA. Alternatively, the staging log prints the ID
 for `npm stage approve <stage-id>`. Approval is the last step: no local Git
