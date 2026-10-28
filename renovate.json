@@ -2,7 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:best-practices"],
   "timezone": "America/Los_Angeles",
-  "minimumReleaseAge": "30 days",
+  "minimumReleaseAge": "14 days",
   "packageRules": [
     {
       "groupName": "Routine updates",
