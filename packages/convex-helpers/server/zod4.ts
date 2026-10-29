@@ -1869,7 +1869,8 @@ export type ZodFromValidatorBase<V extends GenericValidator> =
             ? z.ZodUnion<
                 readonly [
                   z.ZodBigInt,
-                  z.ZodCustom<CommitTsPlaceholder, CommitTsPlaceholder>,
+                  // `ZodCustom` before Zod 4.6, `ZodInstanceOf` since then
+                  ReturnType<typeof z.instanceof<typeof CommitTsPlaceholder>>,
                 ]
               >
             : V extends VBoolean<any>
