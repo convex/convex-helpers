@@ -1,7 +1,7 @@
 // Typechecks the root project once for each tested Zod version (see
 // scripts/zodVersions.mjs), with all `zod` imports resolving to that version.
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import {
@@ -14,6 +14,19 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const configDir = path.join(root, "node_modules/.cache/zod-typecheck");
 const tsc = path.join(root, "node_modules/.bin/tsc");
 mkdirSync(configDir, { recursive: true });
+
+// If an alias isn't installed, the `paths` mapping silently falls back to the
+// root `zod`, so the version would pass without being tested.
+const missingAliases = zodVersionAliases.filter(
+  (alias) =>
+    !existsSync(path.join(root, "node_modules", alias, "package.json")),
+);
+if (missingAliases.length > 0) {
+  console.error(
+    `Missing Zod versions in node_modules: ${missingAliases.join(", ")}. Run \`npm install\`.`,
+  );
+  process.exit(1);
+}
 
 const results = [];
 for (const alias of zodVersionAliases) {
