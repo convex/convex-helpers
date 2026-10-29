@@ -31,7 +31,11 @@ export const zodVersionAliases = Object.keys({
  *
  * @type {Record<string, number>}
  */
-export const zodTestFileMinMinor = {};
+export const zodTestFileMinMinor = {
+  "server/zod4.functions.zod41.test.ts": 1,
+  "server/zod4.zodtoconvex.zod41.test.ts": 1,
+  "server/zod4.zodtoconvex.mini.zod41.test.ts": 1,
+};
 
 /** The Zod versions that are known to fail `npm run typecheck:zod`, with why.
  *
@@ -41,6 +45,8 @@ export const zodTestFileMinMinor = {};
  * @type {Record<string, string>}
  */
 export const zodKnownTypecheckFailures = {
+  "zod-4.0":
+    "With zod/mini, branded objects get an extra `[$brand]` key in their inferred type",
   "zod-4.1":
     "With zod/mini, branded objects get an extra `[$brand]` key in their inferred type",
   "zod-4.2":

@@ -36,11 +36,13 @@ for (const alias of zodVersionAliases) {
     configPath,
     JSON.stringify(
       {
-        // `include` is inherited, and resolved relative to the root tsconfig.
         extends: path.join(root, "tsconfig.json"),
         compilerOptions: {
           paths: { zod: [zodDir], "zod/*": [path.join(zodDir, "*")] },
         },
+        // Only the helpers' tests (and the helpers they import). The examples
+        // in convex/ and example-ui/ are typechecked with the default `zod`.
+        include: [path.join(root, "packages/convex-helpers/**/*.test.ts")],
         exclude: [
           path.join(root, "**/dist/**"),
           ...zodExcludedTestFiles(alias).map((file) =>
