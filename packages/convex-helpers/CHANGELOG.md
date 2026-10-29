@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.131
+
+- Zod 4 support: fixed a regression in 0.1.130 when chaining multiple `.brand()`
+  calls together.
+
 ## 0.1.130
 
 - Zod 4 support: bug fixes when used across different Zod versions:
