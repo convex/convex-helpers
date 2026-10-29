@@ -51,6 +51,8 @@ export const zodKnownTypecheckFailures = {
     "With zod/mini, branded objects get an extra `[$brand]` key in their inferred type",
   "zod-4.2":
     "With zod/mini, branded objects get an extra `[$brand]` key in their inferred type",
+  "zod-4.6":
+    "`z.instanceof()` returns `ZodInstanceOf`, which doesn't match the commitTs type of `ZodValidatorFromConvex`",
 };
 
 /** @param {string} alias e.g. `zod-4.2` */
