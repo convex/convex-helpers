@@ -1,6 +1,7 @@
 import * as zCore from "zod/v4/core";
 import * as z from "zod/v4";
 import { describe, expect, expectTypeOf, test } from "vitest";
+import { testFailingSinceZod } from "../test/zodVersion";
 import {
   GenericId,
   GenericValidator,
@@ -467,7 +468,9 @@ describe("zodToConvex + zodOutputToConvex", () => {
       );
     });
 
-    test("key = literal", () => {
+    // Fails on Zod ≥ 4.5, where partial records set `def.partial` instead of
+    // clearing the key values
+    testFailingSinceZod("4.5")("key = literal", () => {
       testZodToConvexInputAndOutput(
         z.partialRecord(z.literal("user"), z.number()),
         // Convex records can’t have string literals as keys
@@ -487,7 +490,9 @@ describe("zodToConvex + zodOutputToConvex", () => {
       );
     });
 
-    test("key = union of literals", () => {
+    // Fails on Zod ≥ 4.5, where partial records set `def.partial` instead of
+    // clearing the key values
+    testFailingSinceZod("4.5")("key = union of literals", () => {
       testZodToConvexInputAndOutput(
         z.partialRecord(
           z.union([z.literal("user"), z.literal("admin")]),

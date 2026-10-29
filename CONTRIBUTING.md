@@ -43,6 +43,14 @@ Adding helpers usually involves:
 6. A [Stack](https://stack.convex.dev) post on it - what problem it solves,
    a blurb on how to use it. Update this README with the link when it's live.
 
+## Testing the Zod helpers against several Zod versions
+
+The Zod tests run, and are typechecked, against several Zod 4 versions: one per
+`zod-4.<minor>` alias in [the root package.json](./package.json). Run a single
+version with `npx vitest run --project zod-4.2` and typecheck every version with
+`npm run typecheck:zod`. See [`scripts/zodVersions.mjs`](./scripts/zodVersions.mjs)
+for how to add a version or mark known failures.
+
 ## Recommendations
 
 1. Include a block comment at the top of the file about how to use it.

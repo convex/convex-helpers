@@ -16,6 +16,11 @@
     {
       "matchDepTypes": ["devDependencies"],
       "automerge": true
+    },
+    {
+      "description": "Keep each zod-4.x test alias on its own minor (see scripts/zodVersions.mjs)",
+      "matchDepNames": ["/^zod-4\\.\\d+$/"],
+      "rangeStrategy": "in-range-only"
     }
   ]
 }
