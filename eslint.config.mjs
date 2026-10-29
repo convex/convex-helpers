@@ -23,6 +23,7 @@ export default [
       "convex/vitest.config.mts",
       "setup.cjs",
       "**/_generated/",
+      ".claude/**",
       "example-ui/vite.config.mts",
       "vitest.config.mts",
       "vitest.workspace.ts",
