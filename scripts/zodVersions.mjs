@@ -44,14 +44,7 @@ export const zodTestFileMinMinor = {
  *
  * @type {Record<string, string>}
  */
-export const zodKnownTypecheckFailures = {
-  "zod-4.0":
-    "With zod/mini, branded objects get an extra `[$brand]` key in their inferred type",
-  "zod-4.1":
-    "With zod/mini, branded objects get an extra `[$brand]` key in their inferred type",
-  "zod-4.2":
-    "With zod/mini, branded objects get an extra `[$brand]` key in their inferred type",
-};
+export const zodKnownTypecheckFailures = {};
 
 /** @param {string} alias e.g. `zod-4.2` */
 export function zodAliasMinor(alias) {
