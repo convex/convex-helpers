@@ -1132,13 +1132,19 @@ type ConvexValidatorFromZodCommon<
                           // schemas degrade to a recoverable error instead.
                           // `$ZodBranded<$ZodObject>` is structurally
                           // `$ZodObject & ...`, so this branch also matches branded
-                          // objects; reattach the brand.
+                          // objects; reattach the brand. Before Zod 4.3, zod/mini's
+                          // `.brand()` spells out `$ZodBranded` instead of using
+                          // the alias, so `Inner` is inferred as the branded
+                          // schema itself: drop its `[$brand]` key so that
+                          // `EOPTInfer` doesn't expand it into a regular property.
                           Z extends zCore.$ZodBranded<
                             infer Inner extends zCore.$ZodType,
                             infer Brand
                           >
                           ? VObject<
-                              EOPTInfer<zCore.infer<Inner>> &
+                              EOPTInfer<
+                                Omit<zCore.infer<Inner>, typeof zCore.$brand>
+                              > &
                                 zCore.$brand<Brand>,
                               ConvexObjectFromZodShape<Fields, Side>,
                               IsOptional
