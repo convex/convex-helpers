@@ -169,6 +169,21 @@ describe("zodToConvex + zodOutputToConvex", () => {
         >,
       );
     });
+    test("chained brands on an object", () => {
+      testZodToConvexInputAndOutput(
+        z.object({ name: z.string() }).brand("A").brand("B"),
+        v.object({ name: v.string() }) as VObject<
+          {
+            name: string;
+          } & zCore.$brand<"A" | "B">,
+          {
+            name: VString<string, "required">;
+          },
+          "required",
+          "name"
+        >,
+      );
+    });
   });
 
   test("object", () => {
