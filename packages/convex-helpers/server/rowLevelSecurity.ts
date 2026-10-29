@@ -252,7 +252,11 @@ class WrapReader<
       : // eslint-disable-next-line @convex-dev/explicit-table-ids -- tableName not available here
         await this.db.get(id);
     if (doc) {
-      if (tableName && !(await this.predicate(tableName, doc))) {
+      if (
+        tableName
+          ? !(await this.predicate(tableName, doc))
+          : this.config.defaultPolicy === "deny"
+      ) {
         return null;
       }
       return doc;
