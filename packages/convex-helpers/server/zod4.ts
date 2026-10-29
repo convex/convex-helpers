@@ -1687,7 +1687,11 @@ function zodToConvexCommon<Z extends zCore.$ZodType>(
   if (validator instanceof zCore.$ZodRecord) {
     const { keyType, valueType } = validator._zod.def;
 
-    const isPartial = keyType._zod.values === undefined;
+    // Zod < 4.5 marks partial records by clearing the key values, Zod ≥ 4.5
+    // sets `def.partial` instead (and keeps the key values).
+    const isPartial =
+      keyType._zod.values === undefined ||
+      (validator._zod.def as { partial?: boolean }).partial === true;
 
     // Convert value type, stripping optional
     const valueValidator = toConvex(valueType);
