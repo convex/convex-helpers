@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.130
+
+- Zod 4 support: bug fixes when used across different Zod versions:
+  - `zodToConvex` now makes the fields of `z.partialRecord` optional on Zod 4.5
+    and later, with literal and enum keys. Thanks to @aymanemt1 for the fix!
+    (#1025, #1047)
+  - Fixed `TS2589: Type instantiation is excessively deep and possibly infinite`
+    when calling `convexToZod` inline (e.g. in the `args` of `zCustomMutation`)
+    on Zod 4.6.6 and later. Thanks to @jherth for the fix! (#1043)
+  - Fixed the type of `v.commitTs()` in `convexToZod` on Zod 4.6. (#1050)
+  - Fixed the type of branded `zod/mini` objects on Zod 4.0–4.2. (#1051)
+- `validate` and `parse` now reject arrays and class instances (e.g. `Date`,
+  `Map`) for `v.record(...)` validators, as Convex does. Thanks to
+  @RishavTiwari25 for the fix! (#1040)
+
 ## 0.1.129
 
 - (fix:streams) Retry later groups after nonempty pages (#1027)
