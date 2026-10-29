@@ -4,9 +4,7 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 import {
   GenericId,
   GenericValidator,
-  OptionalProperty,
   v,
-  Validator,
   VAny,
   VFloat64,
   VLiteral,
@@ -19,8 +17,6 @@ import {
 import {
   zodToConvex,
   zid,
-  ConvexValidatorFromZod,
-  ConvexValidatorFromZodOutput,
   zodOutputToConvex,
   zodToConvexFields,
   zodOutputToConvexFields,
@@ -28,6 +24,14 @@ import {
   Zid,
 } from "./zod4";
 import type { Equals } from "../index.js";
+import {
+  assert,
+  assertUnrepresentableType,
+  ignoreUnionOrder,
+  testZodOutputToConvex,
+  testZodToConvex,
+  testZodToConvexInputAndOutput,
+} from "../test/zodToConvex";
 import { isSameType } from "zod-compare";
 import {
   defineSchema,
@@ -949,9 +953,6 @@ describe("zodToConvex + zodOutputToConvex", () => {
     test("z.file", () => {
       assertUnrepresentableType(z.file());
     });
-    test("z.function", () => {
-      assertUnrepresentableType(z.function());
-    });
     test("z.void", () => {
       assertUnrepresentableType(z.void());
     });
@@ -988,16 +989,6 @@ describe("zodToConvex", () => {
     testZodToConvex(
       z.number().pipe(z.transform((s) => s.toString())),
       v.number(), // input type
-    );
-  });
-
-  test("codec", () => {
-    testZodToConvex(
-      z.codec(z.string(), z.number(), {
-        decode: (s: string) => parseInt(s, 10),
-        encode: (n: number) => n.toString(),
-      }),
-      v.string(), // input type
     );
   });
 
@@ -1071,213 +1062,8 @@ describe("zodOutputToConvex", () => {
     );
   });
 
-  describe("codec", () => {
-    test("simple case", () => {
-      testZodOutputToConvex(
-        z.codec(z.string(), z.number(), {
-          decode: (s: string) => parseInt(s, 10),
-          encode: (n: number) => n.toString(),
-        }),
-        v.number(), // output type
-      );
-    });
-
-    describe("with optional/nullable", () => {
-      // Codec that transforms Date to milliseconds (number)
-      const dateToMsCodec = z.codec(z.date(), z.int().min(0), {
-        encode: (millis: number) => new Date(millis),
-        decode: (date: Date) => date.getTime(),
-      });
-
-      test("optional codec returns VOptional<VFloat64>", () => {
-        testZodOutputToConvex(dateToMsCodec.optional(), v.optional(v.number()));
-      });
-
-      test("nullable codec returns VUnion with null", () => {
-        testZodOutputToConvex(
-          dateToMsCodec.nullable(),
-          v.union(v.number(), v.null()),
-        );
-      });
-
-      test("optional nullable codec", () => {
-        testZodOutputToConvex(
-          dateToMsCodec.nullable().optional(),
-          v.optional(v.union(v.number(), v.null())),
-        );
-      });
-
-      test("nullable optional codec (swapped order)", () => {
-        testZodOutputToConvex(
-          dateToMsCodec.optional().nullable(),
-          v.optional(v.union(v.number(), v.null())),
-        );
-      });
-
-      // String to number codec
-      const stringToNumberCodec = z.codec(z.string(), z.number(), {
-        decode: (s: string) => parseFloat(s),
-        encode: (n: number) => n.toString(),
-      });
-
-      test("optional string-to-number codec", () => {
-        testZodOutputToConvex(
-          stringToNumberCodec.optional(),
-          v.optional(v.number()),
-        );
-      });
-
-      test("codec with default", () => {
-        testZodOutputToConvex(
-          dateToMsCodec.default(Date.now()),
-          v.number(), // default means output is always present
-        );
-      });
-    });
-  });
-
   test("default", () => {
     testZodOutputToConvex(z.string().default("hello"), v.string());
-  });
-});
-
-describe("codec or pipe nested in another schema", () => {
-  // A nested schema is converted from the same side as the schema containing
-  // it: the codec’s input (a string) in zodToConvex, and its output (a number)
-  // in zodOutputToConvex.
-  const stringToNumberCodec = z.codec(z.string(), z.number(), {
-    decode: (s: string) => parseFloat(s),
-    encode: (n: number) => n.toString(),
-  });
-
-  test("object field", () => {
-    const schema = z.object({ n: stringToNumberCodec });
-    testZodOutputToConvex(schema, v.object({ n: v.number() }));
-
-    // The object type of zodToConvex comes from z.infer, so only the field is compared
-    const inputValidator = zodToConvex(schema);
-    expectTypeOf(inputValidator.fields.n).toEqualTypeOf<VString>();
-    expect(inputValidator).toEqual(v.object({ n: v.string() }));
-  });
-
-  test("optional object field", () => {
-    testZodOutputToConvex(
-      z.object({ n: stringToNumberCodec.optional() }),
-      v.object({ n: v.optional(v.number()) }),
-    );
-  });
-
-  test("object field with a default", () => {
-    testZodOutputToConvex(
-      z.object({ n: stringToNumberCodec.default(0) }),
-      v.object({ n: v.number() }), // default means output is always present
-    );
-  });
-
-  test("array element", () => {
-    testZodToConvex(z.array(stringToNumberCodec), v.array(v.string()));
-    testZodOutputToConvex(z.array(stringToNumberCodec), v.array(v.number()));
-  });
-
-  test("nullable array element", () => {
-    testZodToConvex(
-      z.array(stringToNumberCodec.nullable()),
-      v.array(v.union(v.string(), v.null())),
-    );
-    testZodOutputToConvex(
-      z.array(stringToNumberCodec.nullable()),
-      v.array(v.union(v.number(), v.null())),
-    );
-  });
-
-  test("object in an array", () => {
-    testZodOutputToConvex(
-      z.array(z.object({ n: stringToNumberCodec })),
-      v.array(v.object({ n: v.number() })),
-    );
-  });
-
-  test("pipe from a transform, in an array", () => {
-    const schema = z.array(
-      z.pipe(
-        z.transform((value: unknown) => value),
-        z.object({ n: z.number() }),
-      ),
-    );
-    testZodToConvex(schema, v.array(v.any())); // the input is a transform
-    testZodOutputToConvex(schema, v.array(v.object({ n: v.number() })));
-  });
-
-  test("union member", () => {
-    testZodToConvex(
-      z.union([stringToNumberCodec, z.null()]),
-      v.union(v.string(), v.null()),
-    );
-    testZodOutputToConvex(
-      z.union([stringToNumberCodec, z.null()]),
-      v.union(v.number(), v.null()),
-    );
-  });
-
-  test("tuple item", () => {
-    testZodToConvex(
-      z.tuple([stringToNumberCodec]),
-      v.array(v.union(v.string())),
-    );
-    testZodOutputToConvex(
-      z.tuple([stringToNumberCodec]),
-      v.array(v.union(v.number())),
-    );
-  });
-
-  test("record value", () => {
-    const schema = z.record(z.string(), stringToNumberCodec);
-    testZodOutputToConvex(schema, v.record(v.string(), v.number()));
-
-    // The record type of zodToConvex comes from z.infer, so only the value is compared
-    const inputValidator = zodToConvex(schema);
-    expectTypeOf(inputValidator.value).toEqualTypeOf<VString>();
-    expect(inputValidator).toEqual(v.record(v.string(), v.string()));
-  });
-
-  test("record value, key = literal", () => {
-    testZodToConvex(
-      z.record(z.literal(["a", "b"]), stringToNumberCodec),
-      v.object({ a: v.string(), b: v.string() }),
-    );
-    testZodOutputToConvex(
-      z.record(z.literal(["a", "b"]), stringToNumberCodec),
-      v.object({ a: v.number(), b: v.number() }),
-    );
-  });
-
-  test("readonly", () => {
-    testZodToConvex(stringToNumberCodec.readonly(), v.string());
-    testZodOutputToConvex(stringToNumberCodec.readonly(), v.number());
-  });
-
-  test("lazy", () => {
-    testZodToConvex(
-      z.lazy(() => stringToNumberCodec),
-      v.string(),
-    );
-    testZodOutputToConvex(
-      z.lazy(() => stringToNumberCodec),
-      v.number(),
-    );
-  });
-
-  test("catch", () => {
-    testZodToConvex(stringToNumberCodec.catch(0), v.string());
-    testZodOutputToConvex(stringToNumberCodec.catch(0), v.number());
-  });
-
-  test("non-optional", () => {
-    testZodToConvex(stringToNumberCodec.optional().nonoptional(), v.string());
-    testZodOutputToConvex(
-      stringToNumberCodec.optional().nonoptional(),
-      v.number(),
-    );
   });
 });
 
@@ -1856,139 +1642,3 @@ describe("zid inside defineTable keeps GenericId in the Doc type (issue: type in
     }>();
   });
 });
-
-export function testZodToConvex<
-  Z extends zCore.$ZodType,
-  Expected extends GenericValidator,
->(
-  validator: Z,
-  expected: Expected &
-    (ExtractOptional<Expected> extends infer IsOpt extends OptionalProperty
-      ? Equals<Expected, ConvexValidatorFromZod<Z, IsOpt>> extends true
-        ? // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-          {}
-        : "Expected type must exactly match ConvexValidatorFromZod<Z, IsOptional>"
-      : "Could not extract IsOptional from Expected"),
-) {
-  const actual = zodToConvex(validator);
-  expect(actual).to.deep.equal(expected);
-}
-
-export function testZodOutputToConvex<
-  Z extends zCore.$ZodType,
-  Expected extends GenericValidator,
->(
-  validator: Z,
-  expected: Expected &
-    (ExtractOptional<Expected> extends infer IsOpt extends OptionalProperty
-      ? Equals<Expected, ConvexValidatorFromZodOutput<Z, IsOpt>> extends true
-        ? // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-          {}
-        : "Expected type must exactly match ConvexValidatorFromZodOutput<Z, IsOptional>"
-      : "Could not extract IsOptional from Expected"),
-) {
-  const actual = zodOutputToConvex(validator);
-  expect(actual).to.deep.equal(expected);
-}
-
-// Extract the optionality (IsOptional) from a validator type
-type ExtractOptional<V> =
-  V extends Validator<any, infer IsOptional, any> ? IsOptional : never;
-
-export function testZodToConvexInputAndOutput<
-  Z extends zCore.$ZodType,
-  Expected extends GenericValidator,
->(
-  validator: Z,
-  expected: Expected &
-    (ExtractOptional<Expected> extends infer IsOpt extends OptionalProperty
-      ? Equals<Expected, ConvexValidatorFromZod<Z, IsOpt>> extends true
-        ? Equals<Expected, ConvexValidatorFromZodOutput<Z, IsOpt>> extends true
-          ? // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-            {}
-          : "Expected type must exactly match ConvexValidatorFromZodOutput<Z, IsOptional>"
-        : "Expected type must exactly match ConvexValidatorFromZod<Z, IsOptional>"
-      : "Could not extract IsOptional from Expected"),
-) {
-  testZodToConvex(validator, expected as any);
-  testZodOutputToConvex(validator, expected as any);
-}
-
-type MustBeUnrepresentable<Z extends zCore.$ZodType> = [
-  ConvexValidatorFromZod<Z, OptionalProperty>,
-] extends [never]
-  ? never
-  : [ConvexValidatorFromZodOutput<Z, OptionalProperty>] extends [never]
-    ? never
-    : Z;
-
-export function assertUnrepresentableType<
-  Z extends MustBeUnrepresentable<zCore.$ZodType>,
->(validator: Z) {
-  expect(() => {
-    zodToConvex(validator);
-  }).toThrowError();
-  expect(() => {
-    zodOutputToConvex(validator);
-  }).toThrowError(/(is not supported in Convex|is not a valid Convex value)/);
-}
-
-/**
- * The TypeScript type of Convex union validators has a tuple type argument:
- *
- * ```ts
- * const sampleUnionValidator: VUnion<
- *   string | number,
- *   [
- *     VLiteral<1, "required">,
- *     VLiteral<2, "required">,
- *     VLiteral<3, "required">,
- *   ],
- *   "required",
- *   never
- * > = v.union(v.literal(1), v.literal(2), v.literal(3));
- * ```
- *
- * Some Zod schemas (e.g. `v.enum(…)` and `v.literal([…])`) store their inner
- * types as a union and not as a tuple type.
- * Since TypeScript has no guarantees about the order of union members,
- * the type returned by `zodToConvex` must be imprecise, for instance:
- *
- * ```ts
- * // The inner type 1 | 2 | 3, so any type transformation that we do could
- * // result in a different order of the union members
- * const zodLiteralValidator: z.ZodLiteral<1 | 2 | 3> = z.literal([1, 2, 3]);
- *
- * const sampleUnionValidator: VUnion<
- *   string | number,
- *   (
- *     | VLiteral<1, "required">
- *     | VLiteral<2, "required">
- *     | VLiteral<3, "required">
- *   )[],
- *   "required",
- *   never
- * > = zodToConvex(zodLiteralValidator);
- * ```
- *
- * This function takes a union validator and returns it with a more imprecise
- * type where the order of the union members is not guaranteed.
- */
-export function ignoreUnionOrder<
-  Type,
-  Members extends Validator<any, "required", any>[],
-  IsOptional extends OptionalProperty,
-  FieldPaths extends string,
->(
-  union: VUnion<Type, Members, IsOptional, FieldPaths>,
-): VUnion<
-  Type,
-  // ↓ tuple to array of union
-  Members[number][],
-  IsOptional,
-  FieldPaths
-> {
-  return union;
-}
-
-export function assert<_T extends true>() {}

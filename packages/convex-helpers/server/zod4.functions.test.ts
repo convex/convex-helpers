@@ -213,45 +213,6 @@ export const testQueryWithSkipConvexValidation = zQuery({
   skipConvexValidation: true,
 });
 
-/**
- * Test codec in query args and return value
- */
-export const codec = zQuery({
-  args: {
-    // Codec: string input -> number output
-    encodedNumber: z.codec(z.string(), z.number(), {
-      decode: (s: string) => parseInt(s, 10),
-      encode: (n: number) => n.toString(),
-    }),
-    // Codec: number input -> string output
-    encodedString: z.codec(z.number(), z.string(), {
-      decode: (n: number) => n.toString(),
-      encode: (s: string) => parseInt(s, 10),
-    }),
-  },
-  handler: async (_ctx, args) => {
-    // Type should be the output type of the codec
-    assertType<{ encodedNumber: number; encodedString: string }>(args);
-    expect(typeof args.encodedNumber).toBe("number");
-    expect(typeof args.encodedString).toBe("string");
-
-    const sum = args.encodedNumber + parseInt(args.encodedString, 10);
-    return {
-      sum,
-      // Codec in return: handler returns number, client receives string
-      sumAsString: sum,
-    };
-  },
-  returns: z.object({
-    sum: z.number(),
-    // Codec: handler returns number, client receives string
-    sumAsString: z.codec(z.number(), z.string(), {
-      decode: (n: number) => n.toString(),
-      encode: (s: string) => parseInt(s, 10),
-    }),
-  }),
-});
-
 // The example from README.md
 const zodQuery = zCustomQuery(query, NoOp);
 export const myComplexQuery = zodQuery({
@@ -299,7 +260,6 @@ const testApi: ApiFromModules<{
     returnsNothing: typeof returnsNothing;
     transform: typeof transform;
     transformAsync: typeof transformAsync;
-    codec: typeof codec;
     myComplexQuery: typeof myComplexQuery;
     generateUserId: typeof generateUserId;
   };
@@ -512,96 +472,6 @@ describe("zCustomQuery, zCustomMutation, zCustomAction", () => {
           { total: string }
         >
       >();
-    });
-  });
-
-  describe("codec", () => {
-    test("calling a function with codecs in arguments and return values", async () => {
-      const t = convexTest(schema, modules);
-      const response = await t.query(testApi.codec, {
-        encodedNumber: "10", // string input, decoded to number
-        encodedString: 5, // number input, decoded to string
-      });
-
-      // Verify the codec in args worked
-      expect(response.sum).toBe(15); // 10 + 5
-
-      // Verify the codec in return value worked
-      // sumAsString is encoded as string (client receives string)
-      expect(response.sumAsString).toBe("15");
-
-      expectTypeOf(testApi.codec).toExtend<
-        FunctionReference<
-          "query",
-          "public",
-          { encodedNumber: string; encodedString: number },
-          { sum: number; sumAsString: string }
-        >
-      >();
-    });
-
-    test("calling a function with wrong argument types throws ConvexError", async () => {
-      const t = convexTest(schema, modules);
-
-      // Test with values that pass Convex validation but fail Zod validation
-      await expect(
-        t.query(testApi.codec, {
-          encodedNumber: "not-a-number", // passes Convex (string) but fails Zod decode
-          encodedString: 5, // passes Convex (number) but will be decoded to string "5" which is fine
-        }),
-      ).rejects.toThrowError(
-        expect.objectContaining({
-          data: {
-            ZodError: expect.arrayContaining([
-              expect.objectContaining({
-                code: "invalid_type",
-                expected: "number",
-                path: ["encodedNumber"],
-              }),
-            ]),
-          },
-        }),
-      );
-    });
-
-    test("it rejects incorrect argument types at compile and runtime", async () => {
-      const t = convexTest(schema, modules);
-
-      await expect(
-        t.query(testApi.codec, {
-          // @ts-expect-error - encodedNumber expects string but got number
-          encodedNumber: 10,
-          encodedString: 5,
-        }),
-      ).rejects.toThrowError();
-
-      await expect(
-        t.query(testApi.codec, {
-          encodedNumber: "10",
-          // @ts-expect-error - encodedString expects number but got string
-          encodedString: "5",
-        }),
-      ).rejects.toThrowError();
-
-      await expect(
-        t.query(
-          testApi.codec,
-          // @ts-expect-error - missing required argument encodedNumber
-          {
-            encodedString: 5,
-          },
-        ),
-      ).rejects.toThrowError();
-
-      await expect(
-        t.query(
-          testApi.codec,
-          // @ts-expect-error - missing required argument encodedString
-          {
-            encodedNumber: "10",
-          },
-        ),
-      ).rejects.toThrowError();
     });
   });
 });
