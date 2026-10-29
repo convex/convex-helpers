@@ -46,7 +46,7 @@ export const zodKnownTypecheckFailures = {
   "zod-4.2":
     "With zod/mini, branded objects get an extra `[$brand]` key in their inferred type",
   "zod-4.6":
-    "`z.instanceof()` returns `ZodInstanceOf`, and type instantiation is excessively deep in the record case of `ZodFromValidatorBase`",
+    "Type instantiation is excessively deep in the record case of `ZodFromValidatorBase`",
 };
 
 /** @param {string} alias e.g. `zod-4.2` */
