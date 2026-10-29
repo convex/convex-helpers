@@ -17,7 +17,14 @@ import {
 import { convexTest } from "convex-test";
 import { assertType, describe, expect, expectTypeOf, test } from "vitest";
 import { modules } from "./setup.test.js";
-import { zCustomQuery, zCustomMutation, zCustomAction, zid } from "./zod4.js";
+import {
+  zCustomQuery,
+  zCustomMutation,
+  zCustomAction,
+  zid,
+  convexToZod,
+  convexToZodFields,
+} from "./zod4.js";
 import { z } from "zod/v4";
 import { v } from "convex/values";
 import { NoOp } from "./customFunctions.js";
@@ -101,6 +108,44 @@ export const testMutation = zMutation({
     score: z.number(),
     passed: z.boolean(),
   }),
+});
+
+/**
+ * Test converted Convex validators used inline as args. With zod >= 4.6.6,
+ * inferring the converted type from the expected args type was too deep
+ * to typecheck (TS2589).
+ */
+const vResult = v.union(
+  v.object({ kind: v.literal("success"), returnValue: v.any() }),
+  v.object({ kind: v.literal("failed"), error: v.string() }),
+  v.object({ kind: v.literal("canceled") }),
+);
+
+export const testMutationConvexToZodArgs = zMutation({
+  args: {
+    result: convexToZod(vResult),
+    value: convexToZod(v.any()),
+  },
+  handler: async (_ctx, args) => {
+    expectTypeOf(args.result.kind).toEqualTypeOf<
+      "success" | "failed" | "canceled"
+    >();
+    expectTypeOf(args.value).toEqualTypeOf<any>();
+    return null;
+  },
+  returns: z.null(),
+});
+
+export const testMutationConvexToZodFieldsArgs = zMutation({
+  args: convexToZodFields({ result: vResult, value: v.any() }),
+  handler: async (_ctx, args) => {
+    expectTypeOf(args.result.kind).toEqualTypeOf<
+      "success" | "failed" | "canceled"
+    >();
+    expectTypeOf(args.value).toEqualTypeOf<any>();
+    return null;
+  },
+  returns: z.null(),
 });
 
 /**
