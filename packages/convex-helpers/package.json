@@ -168,7 +168,7 @@
     "hono": "^4.0.5",
     "react": "^17.0.2 || ^18.0.0 || ^19.0.0",
     "typescript": "^5.5 || ^6.0.0 || ^7.0.0",
-    "zod": "^3.25.0 || ^4.0.0"
+    "zod": "^3.25.0 || ^4.1.0"
   },
   "peerDependenciesMeta": {
     "@standard-schema/spec": {

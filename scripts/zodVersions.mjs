@@ -5,6 +5,9 @@
 // where all `zod` imports resolve to that alias. To test a new version, add an
 // alias and run `npm install`.
 //
+// The oldest alias should be the oldest Zod 4 minor allowed by the `zod` peer
+// dependency in packages/convex-helpers/package.json.
+//
 // For tests that depend on the Zod version (`zodAtLeast`, `testFailingSinceZod`),
 // see packages/convex-helpers/test/zodVersion.ts.
 import { readFileSync } from "node:fs";
