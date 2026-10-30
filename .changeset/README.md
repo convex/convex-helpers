@@ -1,17 +1,14 @@
 # Release notes
 
-Run `npm run changeset` for changes that should ship in the next npm release.
-Select `convex-helpers`, choose the version bump, and describe the user-visible
-change. Commit the generated Markdown file with the implementation.
+Run `npx changeset` for changes that should ship in the next npm release. Select
+`convex-helpers`, choose the version bump, and describe the user-visible change.
+Commit the generated Markdown file with the implementation. Docs-only and
+development-tooling changes do not need a changeset.
 
-Docs-only and development-tooling changes do not need a changeset.
+Maintainers run `npx changeset version` to consume notes and update the root
+version and changelog, then review, commit, and land those changes on main. CI
+stages that exact commit and tags it after staging succeeds. A maintainer approves
+the package on npm with 2FA; no later finalization step is required.
 
-Maintainers run `npm run release` to consume pending notes, generate the changelog,
-update the version and lockfile, commit, and push to main. With no pending notes,
-the command prompts to add one in an interactive terminal. A release PR is
-optional: `npm run release:prepare` prepares the same files without committing or
-pushing. CI stages the exact release commit and then tags it. A maintainer
-approves the staged version on npm with 2FA; there is no later finalization step.
-
-See [CONTRIBUTING.md](../CONTRIBUTING.md#releasing) for stable and alpha releases,
-approval links, retries, and the optional `--watch` handoff.
+See [CONTRIBUTING.md](../CONTRIBUTING.md#releasing) for checks, branch alphas,
+approval, and retries. There is no local release wrapper or release-PR bot.
