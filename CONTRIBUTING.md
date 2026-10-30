@@ -95,6 +95,26 @@ choose the npm dist-tag (`alpha`, `beta`, etc.); identifiers that npm treats as
 version ranges (such as numeric identifiers) use `next`. Stable versions use
 `latest`.
 
+Installation, validation, tests, and packing run in a build job without npm OIDC
+permission. A separate staging job uploads that tarball without installing
+dependencies or executing package scripts. Caching is disabled throughout the
+release workflow to avoid reusing potentially poisoned caches.
+
+Only pushes to `main` automatically start releases; opening or updating a PR
+(including a Changesets release PR) does not. To stage an alpha from another
+branch, commit its version bump and changelog, push the branch, then explicitly run:
+
+```sh
+gh workflow run release.yml --ref my-alpha-branch
+```
+
+The selected branch tip must change the package version. Use `-f commit=<full-sha>`
+to select an earlier version-bump commit on that branch. CI checks, staging,
+approval, and tagging are the same as for main. The workflow must first exist on
+the default branch for manual dispatch to be available. The repository guard
+skips releases in forks, avoiding failures from missing npm trust; a fork that
+wants to publish can update that guard and configure its own npm trusted publisher.
+
 After staging succeeds, a separate tag job creates `npm/<version>` at the release
 commit. It accepts an existing matching tag and refuses to move a conflicting
 tag. **A Git tag means staging succeeded, not that the version is publicly
@@ -116,6 +136,8 @@ The workflow uses the npm bundled with the Node version in `.nvmrc`: Node
 24.18.0 includes npm 11.16.0, meeting the npm 11.15.0 minimum for staged
 publishing. GitHub Actions also needs permission to create `npm/*` tags under
 the repository's rulesets.
+No GitHub environment is required or bound to the npm trust relationship, so
+explicit manual releases can also run from other branches.
 
 ### Failures and retries
 
@@ -124,7 +146,7 @@ the repository's rulesets.
   inspect and finish or discard its uncommitted changes before trying again.
 - If checks or staging fail, inspect the log. Re-run the failed jobs for a
   transient failure. The manual Release workflow also accepts the full SHA of a
-  version-bump commit already on main. It cannot stage arbitrary branch commits.
+  version-bump commit on the selected ref, defaulting to that ref's tip.
 - If only tagging fails, **re-run failed jobs**, which reuses the successful
   staging job. Do not rerun the entire workflow: npm rejects an already-staged or
   published version. Registry/authentication errors are failures, not silently

@@ -81,12 +81,18 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  const requested = process.env.RELEASE_COMMIT;
+  const requested =
+    process.env.RELEASE_COMMIT ||
+    (process.env.GITHUB_EVENT_NAME === "workflow_dispatch"
+      ? process.env.GITHUB_SHA
+      : undefined);
   let release;
   if (requested) {
     if (!/^[a-f0-9]{40}$/.test(requested))
-      throw new Error("Use the full SHA of a version-bump commit on main");
-    git("merge-base", "--is-ancestor", requested, "origin/main");
+      throw new Error(
+        "Use the full SHA of a version-bump commit on the selected ref",
+      );
+    git("merge-base", "--is-ancestor", requested, process.env.GITHUB_SHA);
     release = releaseAt(requested);
     if (!release) throw new Error("This commit does not bump the version");
   } else {

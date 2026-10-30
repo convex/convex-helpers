@@ -90,8 +90,8 @@ test("tag permission failures remain failures", async (t) => {
 });
 
 test("release jobs use the planned commit and channel with separate credentials", () => {
-  const { stage, tag } = workflow.jobs;
-  assert.equal(stage.if, "needs.plan.outputs.release != 'null'");
+  const { build, stage, tag } = workflow.jobs;
+  assert.equal(build.if, "needs.plan.outputs.release != 'null'");
   assert.equal(
     stage.steps[0].with.ref,
     "${{ fromJSON(needs.plan.outputs.release).sha }}",
@@ -108,6 +108,26 @@ test("release jobs use the planned commit and channel with separate credentials"
   assert.equal(tag.steps[0].env.VERSION, upload.env.VERSION);
   assert.equal(tag.steps[0].env.RELEASE_SHA, stage.steps[0].with.ref);
   assert.deepEqual(tag.needs, ["plan", "stage"]);
+  assert.deepEqual(stage.needs, ["plan", "build"]);
+  assert.deepEqual(build.permissions, { contents: "read" });
+  assert.equal(build.steps[0].with.ref, stage.steps[0].with.ref);
+  const artifact = build.steps.find((step) => step.id === "artifact");
+  const download = stage.steps.find((step) =>
+    step.uses?.startsWith("actions/download-artifact@"),
+  );
+  assert(artifact.uses.startsWith("actions/upload-artifact@"));
+  assert.equal(
+    download.with["artifact-ids"],
+    "${{ needs.build.outputs.artifact-id }}",
+  );
+  assert.equal(stage.steps[0].with["sparse-checkout"], ".nvmrc");
+  assert.equal(stage.steps.filter((step) => step.run).length, 1);
+  assert.match(
+    upload.run,
+    /npm stage publish "\.\/convex-helpers-\$VERSION\.tgz" --ignore-scripts/,
+  );
+  assert.match(upload.run, /GITHUB_SHA="\$RELEASE_SHA" npm stage publish/);
+  assert.equal(upload["working-directory"], download.with.path);
   assert.equal(
     workflow.jobs.tag.if,
     undefined,
@@ -124,4 +144,15 @@ test("release jobs use the planned commit and channel with separate credentials"
     "id-token": "write",
   });
   assert.deepEqual(workflow.jobs.tag.permissions, { contents: "write" });
+});
+
+test("releases are automatic only on main, with explicit dispatch and a fork guard", () => {
+  assert.deepEqual(workflow.on.push.branches, ["main"]);
+  assert.equal(workflow.on.pull_request, undefined);
+  assert.equal(workflow.on.workflow_dispatch.inputs.commit.required, false);
+  assert.equal(
+    workflow.jobs.plan.if,
+    "github.repository == 'convex/convex-helpers'",
+  );
+  assert.equal(workflow.jobs.stage.environment, undefined);
 });

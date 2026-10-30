@@ -392,3 +392,47 @@ test("CI validates complete SemVer and chooses npm-compatible dist-tags", (t) =>
     assert.equal(result.distTag, distTag);
   }
 });
+
+test("manual dispatch stages the selected branch tip or an earlier release commit", (t) => {
+  const f = fixture(t);
+  const pkg = JSON.parse(readFileSync(path.join(f.cwd, "package.json")));
+  pkg.version = "0.1.129-alpha.0";
+  f.write("package.json", JSON.stringify(pkg));
+  const releaseSha = f.commit();
+  const dispatch = (tip, requested = "") => {
+    const output = path.join(f.bin, "output");
+    writeFileSync(output, "");
+    const result = spawnSync(process.execPath, ["scripts/release-plan.mjs"], {
+      cwd: f.cwd,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_EVENT_NAME: "workflow_dispatch",
+        GITHUB_SHA: tip,
+        RELEASE_COMMIT: requested,
+        GITHUB_OUTPUT: output,
+      },
+    });
+    return { ...result, output: readFileSync(output, "utf8") };
+  };
+  let result = dispatch(releaseSha);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.output.slice("release=".length)), {
+    sha: releaseSha,
+    version: "0.1.129-alpha.0",
+    distTag: "alpha",
+  });
+  assert.notEqual(releaseSha, f.git("rev-parse", "origin/main"));
+  f.write("feature.txt", "after release");
+  const tip = f.commit();
+  assert.equal(dispatch(tip, releaseSha).status, 0);
+  result = dispatch(tip);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /does not bump the version/);
+  assert.notEqual(
+    dispatch(f.initial, releaseSha).status,
+    0,
+    "reject commits outside the selected ref",
+  );
+  assert.notEqual(dispatch(tip, "--all").status, 0, "require a full SHA");
+});

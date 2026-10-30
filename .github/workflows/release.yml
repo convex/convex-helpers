@@ -1,7 +1,8 @@
 name: Release
 
 # Version-bump commits on main are release candidates, whether pushed directly
-# or merged in a PR. npm must grant this workflow STAGE-ONLY trusted publishing.
+# or merged in a PR. Other branches require an explicit manual dispatch.
+# npm must grant this workflow STAGE-ONLY trusted publishing.
 # A successful upload gets a Git tag; a maintainer still approves on npm with 2FA.
 on:
   push:
@@ -9,8 +10,8 @@ on:
   workflow_dispatch:
     inputs:
       commit:
-        description: "Full SHA of a version-bump commit already on main (retry staging)"
-        required: true
+        description: "Full SHA of a version-bump commit on the selected ref (defaults to its tip)"
+        required: false
         type: string
 
 # Different pushes must not cancel each other. Duplicate runs for one push serialize.
@@ -22,7 +23,8 @@ permissions: {}
 
 jobs:
   plan:
-    if: github.repository == 'convex/convex-helpers' && github.ref == 'refs/heads/main'
+    # Forks should skip publishing rather than fail because npm trust is absent.
+    if: github.repository == 'convex/convex-helpers'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -37,6 +39,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: ".nvmrc"
+          # Intentionally avoid restoring caches in the release workflow.
           package-manager-cache: false
       - run: npm ci --ignore-scripts
       - name: Find the release commit
@@ -46,14 +49,15 @@ jobs:
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: node scripts/release-plan.mjs
 
-  stage:
+  build:
     needs: plan
     if: needs.plan.outputs.release != 'null'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
-      id-token: write
+    outputs:
+      artifact-id: ${{ steps.artifact.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -62,7 +66,6 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: ".nvmrc"
-          registry-url: "https://registry.npmjs.org"
           package-manager-cache: false
       - name: Validate, build, and test the release commit
         run: |
@@ -71,7 +74,44 @@ jobs:
           npm run build
           npm run lint
           npm test
+      - name: Pack the tested build without rebuilding
+        run: |
+          mkdir -p "$RUNNER_TEMP/npm-release"
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/npm-release"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: artifact
+        with:
+          name: npm-release
+          path: ${{ runner.temp }}/npm-release/*.tgz
+          if-no-files-found: error
+
+  stage:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    # Only upload the tarball: no dependencies or package scripts run with OIDC.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ fromJSON(needs.plan.outputs.release).sha }}
+          persist-credentials: false
+          sparse-checkout: .nvmrc
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ".nvmrc"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: ${{ runner.temp }}/npm-release
+          merge-multiple: true
       - name: Stage on npm
+        working-directory: ${{ runner.temp }}/npm-release
         env:
           DIST_TAG: ${{ fromJSON(needs.plan.outputs.release).distTag }}
           VERSION: ${{ fromJSON(needs.plan.outputs.release).version }}
@@ -84,7 +124,9 @@ jobs:
             echo 'The log below contains the stage ID to run: npm stage approve <stage-id>.'
             echo 'The Git tag records successful staging, not approval or publication.'
           } >> "$GITHUB_STEP_SUMMARY"
-          npm stage publish --provenance --tag "$DIST_TAG"
+          # npm provenance otherwise records the event SHA, which may be newer
+          # than the release commit (or different when retrying an older release).
+          GITHUB_SHA="$RELEASE_SHA" npm stage publish "./convex-helpers-$VERSION.tgz" --ignore-scripts --provenance --tag "$DIST_TAG"
 
   tag:
     needs: [plan, stage]
