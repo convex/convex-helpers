@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `open-api-spec` supports `v.bytes()` instead of aborting with "bytes unsupported".
+
 ## 0.1.133
 
 - Zod 4 support: when a `z.object()` schema is passed as `args` to

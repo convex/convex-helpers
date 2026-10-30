@@ -58,7 +58,15 @@ export const openApiSpec = new Command("open-api-spec")
     console.log(chalk.green("Wrote OpenAPI spec to " + outputPath));
   });
 
-function generateSchemaFromValidator(validatorJson: ValidatorJSON): string {
+// The HTTP API takes args in the shape `convexToJson` produces, where bytes are
+// `{ "$bytes": "<base64>" }`, but returns values in its `json` export format,
+// where bytes are a plain base64 string.
+type Side = "args" | "value";
+
+function generateSchemaFromValidator(
+  validatorJson: ValidatorJSON,
+  side: Side,
+): string {
   switch (validatorJson.type) {
     case "null":
       // Necessary because null only becomes explicitly supported in OpenAPI 3.1.0
@@ -73,7 +81,17 @@ function generateSchemaFromValidator(validatorJson: ValidatorJSON): string {
     case "string":
       return "type: string";
     case "bytes":
-      throw new Error("bytes unsupported");
+      return side === "args"
+        ? [
+            "type: object",
+            "required:",
+            "  - $bytes",
+            "properties:",
+            "  $bytes:",
+            "    type: string",
+            "    format: byte",
+          ].join("\n")
+        : "type: string\nformat: byte";
     case "any":
       return "{}";
     case "literal":
@@ -88,7 +106,7 @@ function generateSchemaFromValidator(validatorJson: ValidatorJSON): string {
       return `type: string\ndescription: ID from table "${validatorJson.tableName}"`;
     case "array":
       return `type: array\nitems:\n${reindent(
-        generateSchemaFromValidator(validatorJson.value),
+        generateSchemaFromValidator(validatorJson.value, side),
         1,
       )}`;
     case "record":
@@ -101,7 +119,7 @@ function generateSchemaFromValidator(validatorJson: ValidatorJSON): string {
             requiredProperties.push(key);
           }
           return `${key}:\n${reindent(
-            generateSchemaFromValidator(value.fieldType),
+            generateSchemaFromValidator(value.fieldType, side),
             1,
           )}`;
         },
@@ -125,14 +143,17 @@ function generateSchemaFromValidator(validatorJson: ValidatorJSON): string {
         (v) => v.type !== "null",
       );
       if (nonNullMembers.length === 1 && nullMember !== undefined) {
-        const innerSchema = generateSchemaFromValidator(nonNullMembers[0]!);
+        const innerSchema = generateSchemaFromValidator(
+          nonNullMembers[0]!,
+          side,
+        );
         if (innerSchema === "{}") {
           return "{}";
         }
         return `${innerSchema}\nnullable: true`;
       }
       const members: string[] = nonNullMembers.map((v) =>
-        generateSchemaFromValidator(v),
+        generateSchemaFromValidator(v, side),
       );
       return `${
         nullMember === undefined ? "" : "nullable: true\n"
@@ -214,7 +235,7 @@ function generateEndpointSchemas(func: AnalyzedFunction) {
         - args
       properties:
         args:\n${reindent(
-          generateSchemaFromValidator(func.args ?? { type: "any" }),
+          generateSchemaFromValidator(func.args ?? { type: "any" }, "args"),
           5,
         )}\n
     Response_${shortName}:
@@ -232,7 +253,7 @@ function generateEndpointSchemas(func: AnalyzedFunction) {
         errorData:
           type: object
         value:\n${reindent(
-          generateSchemaFromValidator(func.returns ?? { type: "any" }),
+          generateSchemaFromValidator(func.returns ?? { type: "any" }, "value"),
           5,
         )}\n`;
 }
