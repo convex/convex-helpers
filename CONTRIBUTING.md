@@ -124,32 +124,6 @@ identifier is an npm version range. For subsequent alphas, add changesets and ru
 `npx changeset version` again. Use `npx changeset pre exit` followed by
 `npx changeset version` when preparing a stable release on main.
 
-### One-time setup and forks
-
-Configure npm's trusted publisher for `convex/convex-helpers`, workflow
-`release.yml`, with **staged publishing only**. Disable direct publishing for the
-trust relationship and remove CI credentials that bypass approval. No GitHub
-environment is required, so explicit branch dispatch remains available. GitHub
-Actions needs permission to create `v*` tags. The workflow uses the npm bundled
-with Node from `.nvmrc`, which supports staged publishing.
-
-<<<<<<< HEAD
-Configure the npm trusted publisher for package `convex-helpers`, GitHub
-repository `convex/convex-helpers`, workflow `release.yml`, with **only staged
-publishing allowed**. Disable direct publishing for the trust relationship and
-remove CI tokens that can bypass human approval. The npm-side restriction keeps
-a rogue workflow change from turning a push into a public release without 2FA.
-The workflow uses the npm bundled with the Node version in `.nvmrc`: Node
-24.18.0 includes npm 11.16.0, meeting the npm 11.15.0 minimum for staged
-publishing. GitHub Actions also needs permission to create `npm/*` tags under
-the repository's rulesets.
-=======
-The repository guard skips releases on forks, avoiding missing-trust failures.
-Forks that want their own releases can change the guard and configure npm trust
-for their repository/package. All workflow logic is in the linked YAML; no shared
-release package or remotely maintained reusable workflow is involved.
->>>>>>> 1ca4d2b (Use vanilla Changesets commands and inline release workflow checks)
-
 ### Failures and retries
 
 - For transient check or staging failures, rerun failed jobs. Manual dispatch can
