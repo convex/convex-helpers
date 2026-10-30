@@ -136,7 +136,7 @@ function generateSchemaFromValidator(validatorJson: ValidatorJSON): string {
       );
       return `${
         nullMember === undefined ? "" : "nullable: true\n"
-      }oneOf:\n${members.map((m) => reindent(m, 1, true)).join("\n")}`;
+      }anyOf:\n${members.map((m) => reindent(m, 1, true)).join("\n")}`;
     }
   }
 }

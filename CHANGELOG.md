@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `open-api-spec` renders unions as `anyOf`, so a value matching more than one
+  member validates.
+
 ## 0.1.133
 
 - Zod 4 support: when a `z.object()` schema is passed as `args` to
