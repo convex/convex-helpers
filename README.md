@@ -1290,6 +1290,8 @@ http.route({
 export default http;
 ```
 
+If you turn on `allowCredentials`, list the origins your frontend runs on in `allowedOrigins`. With `"*"`, any website can make requests that carry the user's cookies and read the responses. Note: if you authenticate with a bearer token in the `Authorization` header, you do not need `allowCredentials`.
+
 ## Standard Schema
 
 [Standard Schema](https://github.com/standard-schema/standard-schema)
