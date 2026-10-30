@@ -288,6 +288,13 @@ export const myComplexQuery = zodQuery({
     return args;
   },
 });
+export const refinedArgs = zMutation({
+  args: z
+    .object({ start: z.number(), end: z.number() })
+    .refine((range) => range.start < range.end, "start must be before end"),
+  handler: async (_ctx, args) => args,
+});
+
 export const generateUserId = mutation({
   args: {},
   handler: async ({ db }) => {
@@ -306,6 +313,7 @@ const testApi: ApiFromModules<{
     transform: typeof transform;
     transformAsync: typeof transformAsync;
     myComplexQuery: typeof myComplexQuery;
+    refinedArgs: typeof refinedArgs;
     generateUserId: typeof generateUserId;
   };
 }>["fns"] = anyApi["zod4.functions.test"] as any;
@@ -469,6 +477,25 @@ describe("zCustomQuery, zCustomMutation, zCustomAction", () => {
                 path: ["name"],
               }),
             ]),
+          },
+        }),
+      );
+    });
+  });
+  describe("object schema as args", () => {
+    test("runs .refine() on the object", async () => {
+      const t = convexTest(schema, modules);
+      expect(
+        await t.mutation(testApi.refinedArgs, { start: 1, end: 5 }),
+      ).toEqual({ start: 1, end: 5 });
+      await expect(
+        t.mutation(testApi.refinedArgs, { start: 5, end: 1 }),
+      ).rejects.toThrowError(
+        expect.objectContaining({
+          data: {
+            ZodError: [
+              expect.objectContaining({ message: "start must be before end" }),
+            ],
           },
         }),
       );
