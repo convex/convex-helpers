@@ -2,3 +2,8 @@ node_modules
 package-lock.json
 *.tgz
 *.tsbuildinfo
+dist/
+**/*.test.*
+**/_generated/
+tsconfig.json
+vitest.config.mts

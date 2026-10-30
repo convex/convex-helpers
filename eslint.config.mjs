@@ -12,9 +12,8 @@ export default [
   {
     ignores: [
       "dist/**",
-      "example-ui/dist/**",
       "packages/convex-helpers/dist/**",
-      "packages/convex-helpers/generate-exports.mjs",
+      "example-ui/dist/**",
       "example-ui/src/fakeConvexClient/fakeConvexClient.js",
       "backendHarness.js",
       "test-http-routes.mjs",

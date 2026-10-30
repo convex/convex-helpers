@@ -1,0 +1,21 @@
+{
+  "extends": "./packages/convex-helpers/tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./packages/convex-helpers",
+    "outDir": "./dist",
+    "noEmit": false,
+    "noEmitOnError": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "packages/convex-helpers/dist",
+    "packages/convex-helpers/cli",
+    "**/*.test.*",
+    "**/_generated/**",
+    "packages/convex-helpers/vitest.config.mts"
+  ]
+}
