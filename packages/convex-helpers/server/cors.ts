@@ -35,6 +35,12 @@ export type CorsConfig = {
   /**
    * Whether to allow credentials in the request.
    * When true, the request can include cookies and authentication headers.
+   *
+   * With credentials allowed, every origin in `allowedOrigins` can make
+   * requests that carry the user's cookies and read the responses. So if you
+   * authenticate with cookies, list your frontend's origins there instead of
+   * using "*". Bearer tokens in the `Authorization` header aren't affected,
+   * since browsers don't add those to requests by themselves.
    * @default false
    */
   allowCredentials?: boolean;
@@ -93,13 +99,32 @@ export type CorsHttpRouter = {
 
 /**
  * Factory function to create a router that adds CORS support to routes.
+ * @deprecated With `allowCredentials: true` and no `allowedOrigins`, any
+ * website can make requests that carry the user's cookies and read the
+ * responses. List your frontend's origins in `allowedOrigins`, or pass
+ * `["*"]` if any site really may, e.g. when you use bearer tokens rather
+ * than cookies.
+ */
+export function corsRouter(
+  http: HttpRouter,
+  corsConfig: CorsConfig & {
+    allowCredentials: true;
+    allowedOrigins?: undefined;
+  },
+): CorsHttpRouter;
+/**
+ * Factory function to create a router that adds CORS support to routes.
  * @param allowedOrigins An array of allowed origins for CORS.
  * @returns A function to use instead of http.route when you want CORS.
  */
-export const corsRouter = (
+export function corsRouter(
   http: HttpRouter,
   corsConfig?: CorsConfig,
-): CorsHttpRouter => {
+): CorsHttpRouter;
+export function corsRouter(
+  http: HttpRouter,
+  corsConfig?: CorsConfig,
+): CorsHttpRouter {
   const allowedExactMethodsByPath: Map<string, Set<string>> = new Map();
   const allowedPrefixMethodsByPath: Map<string, Set<string>> = new Map();
   return {
@@ -158,7 +183,7 @@ export const corsRouter = (
       http.prefixRoutes = new Map(tempRouter.prefixRoutes);
     },
   };
-};
+}
 
 /**
  * Handles exact route matching and adds OPTIONS handler.
