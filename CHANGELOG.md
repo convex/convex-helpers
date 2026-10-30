@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.133
+
+- Zod 4 support: when a `z.object()` schema is passed as `args` to
+  `zCustomQuery`/`zCustomMutation`/`zCustomAction`, checks on the object
+  itself (`.refine()`, `.superRefine()`, `.check()`) are now run. Previously
+  they were silently skipped. (#1055)
+
 ## 0.1.132
 
 - Enforces defaultPolicy: "deny" for RLS on bare db.get calls where
