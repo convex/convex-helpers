@@ -875,8 +875,13 @@ function customFnBuilder(
 
     if (args) {
       let argsValidator = args;
+      // When given an object schema, parse with it rather than a new object
+      // built from its shape, so checks on the object itself (.refine(),
+      // .superRefine(), .check()) still run.
+      let argsSchema: zCore.$ZodObject | undefined;
       if (argsValidator instanceof zCore.$ZodType) {
         if (argsValidator instanceof zCore.$ZodObject) {
+          argsSchema = argsValidator;
           argsValidator = argsValidator._zod.def.shape;
         } else {
           throw new Error(
@@ -898,7 +903,10 @@ function customFnBuilder(
             extra,
           );
           const rawArgs = pick(allArgs, Object.keys(argsValidator));
-          const parsed = await z.object(argsValidator).safeParseAsync(rawArgs);
+          const parsed = await zCore.safeParseAsync(
+            argsSchema ?? z.object(argsValidator),
+            rawArgs,
+          );
           if (!parsed.success) {
             throw new ConvexError({
               ZodError: JSON.parse(
