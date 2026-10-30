@@ -694,6 +694,49 @@ const { page, indexKeys, hasMore } = await getPage(ctx, {
 });
 ```
 
+### Paginate within an index prefix
+
+For an index on `["orgId", "chatId", "messageCreatedAt"]`, use the same
+`[orgId, chatId]` prefix for both endpoints to stay within one chat. Set
+`startInclusive: true` for the first page: the default excludes every document
+matching the starting prefix. `endInclusive` defaults to `true`.
+
+Use `absoluteMaxRows` to cap the page size. Providing any `endIndexKey`, including
+a partial key, makes `getPage` ignore `targetMaxRows` so that fixed page boundaries
+can remain adjacent as documents change.
+
+```js
+import schema from "./schema";
+
+const request = {
+  table: "textMessages",
+  index: "by_orgId_chatId_messageCreatedAt",
+  schema,
+  endIndexKey: [orgId, chatId],
+  absoluteMaxRows: numItems,
+};
+const first = await getPage(ctx, {
+  ...request,
+  startIndexKey: [orgId, chatId],
+  startInclusive: true,
+});
+
+if (first.hasMore) {
+  const next = await getPage(ctx, {
+    ...request,
+    startIndexKey: first.indexKeys[first.indexKeys.length - 1],
+    // The default startInclusive: false avoids repeating the last document.
+  });
+}
+```
+
+This also works with `order: "desc"` in `request`. Removing `endIndexKey` does
+not restrict the scan to the starting prefix; it can continue into other chats.
+When refreshing pages for reactive pagination, use the returned full index key
+as the page's fixed end. A hard `absoluteMaxRows` cap can leave gaps if that page
+grows; omit or raise the cap on refresh to allow the page to stay adjacent to the
+next one.
+
 ### `paginator`: manual pagination with familiar syntax
 
 In addition to `getPage`, convex-helpers provides a function

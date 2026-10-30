@@ -106,6 +106,58 @@ describe("manual pagination", () => {
     },
   );
 
+  test.each(["asc", "desc"] as const)(
+    "paginate within an index prefix (%s)",
+    async (order) => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        for (const doc of MANY_DOCS) await ctx.db.insert("foo", doc);
+        const request = {
+          table: "foo",
+          index: "abc",
+          schema,
+          order,
+          startIndexKey: [1, 1],
+          endIndexKey: [1, 1],
+          targetMaxRows: 1,
+        };
+        const expected = MANY_DOCS.filter(({ a, b }) => a === 1 && b === 1);
+        if (order === "desc") expected.reverse();
+
+        // An exclusive starting prefix skips every document in the prefix.
+        const excluded = await getPage(ctx, request);
+        expect(excluded.page).toEqual([]);
+        expect(excluded.hasMore).toBe(false);
+
+        // Even a partial end key ignores targetMaxRows, so use absoluteMaxRows.
+        const all = await getPage(ctx, { ...request, startInclusive: true });
+        expect(all.page.map(stripSystemFields)).toEqual(expected);
+        expect(all.hasMore).toBe(false);
+
+        const first = await getPage(ctx, {
+          ...request,
+          startInclusive: true,
+          absoluteMaxRows: 2,
+        });
+        expect(first.page.map(stripSystemFields)).toEqual(expected.slice(0, 2));
+        expect(first.hasMore).toBe(true);
+        expect(first.indexKeys.map(dropSystemFields)).toEqual(
+          expected.slice(0, 2).map(({ a, b, c }) => [a, b, c]),
+        );
+
+        // Resume exclusively from the full key, keeping the prefix as the end.
+        const next = await getPage(ctx, {
+          ...request,
+          startIndexKey: first.indexKeys[first.indexKeys.length - 1],
+          absoluteMaxRows: 2,
+        });
+        expect(next.page.map(stripSystemFields)).toEqual(expected.slice(2));
+        expect(next.hasMore).toBe(false);
+        expect(next.indexKeys).toEqual(all.indexKeys.slice(2));
+      });
+    },
+  );
+
   test("middle page with exclusive/inclusive bounds", async () => {
     const t = convexTest(schema, modules);
     await t.run(async (ctx) => {

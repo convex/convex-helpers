@@ -26,11 +26,16 @@ export type PageRequest<
   table: T;
   /** Where the page starts. Default or empty array is the start of the table. */
   startIndexKey?: IndexKey;
-  /** Whether the startIndexKey is inclusive. Default is false. Ignored for an empty key. */
+  /** Whether the startIndexKey is inclusive. Default is false, which excludes
+   * all documents matching a partial key. Set to true to include that prefix.
+   * Ignored for an empty key.
+   */
   startInclusive?: boolean;
   /** Where the page ends. If provided, all documents up to this key will be
    * included, if possible. targetMaxRows will be ignored (but absoluteMaxRows
    * will not). This ensures adjacent pages stay adjacent, even as they grow.
+   * This also applies to partial keys. To cap a page within an index prefix,
+   * use absoluteMaxRows.
    * An empty array means the end of the table.
    */
   endIndexKey?: IndexKey;
