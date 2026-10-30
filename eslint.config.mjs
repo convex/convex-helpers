@@ -88,12 +88,4 @@ export default [
       ],
     },
   },
-  {
-    files: ["scripts/*.mjs"],
-    languageOptions: {
-      globals: globals.node,
-      parserOptions: { project: null },
-    },
-    rules: { "@typescript-eslint/no-floating-promises": "off" },
-  },
 ];
