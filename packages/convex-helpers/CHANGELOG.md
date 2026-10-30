@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.132
+
+- Enforces defaultPolicy: "deny" for RLS on bare db.get calls where
+  table name is not provided and cannot be determined.
+
 ## 0.1.131
 
 - Zod 4 support: fixed a regression in 0.1.130 when chaining multiple `.brand()`
