@@ -2,6 +2,7 @@ import fs from "fs";
 import { expect, test } from "vitest";
 import { generateOpenApiSpec } from "./openApiSpec.js";
 import { execSync } from "child_process";
+import { parse } from "yaml";
 import { FUNCTIONS_JSON, OPEN_API_SPEC } from "./functions.test.js";
 
 // If this test fails, it means you changed the generated OpenAPI spec. Confirm that these changes are
@@ -69,6 +70,41 @@ test("nullable any field generates valid spec", async () => {
   // nullable any should produce {} (any schema already permits null)
   expect(apiSpec).toMatch(/claimedAt:\s*\n\s*\{\}/);
 }, 10000);
+
+// A Convex union accepts a value matching any member, and members can share a
+// wire shape (an id is a string), so `oneOf` would reject valid values.
+test("unions render as anyOf", async () => {
+  const union = {
+    type: "union",
+    value: [{ type: "string" }, { type: "id", tableName: "users" }],
+  };
+  const functionsJson = JSON.stringify({
+    url: "https://test-convex-url.convex.cloud",
+    functions: [
+      {
+        args: {
+          type: "object",
+          value: { ref: { fieldType: union, optional: false } },
+        },
+        functionType: "Query",
+        identifier: "example.js:get",
+        returns: union,
+        visibility: { kind: "public" },
+      },
+    ],
+  });
+  const apiSpec = generateOpenApiSpec(JSON.parse(functionsJson), true);
+  const schemas = parse(apiSpec).components.schemas;
+
+  expect(schemas["Request_example.get"].properties.args.properties.ref).toEqual(
+    {
+      anyOf: [{ type: "string" }, expect.objectContaining({ type: "string" })],
+    },
+  );
+  expect(schemas["Response_example.get"].properties.value).toEqual({
+    anyOf: [{ type: "string" }, expect.objectContaining({ type: "string" })],
+  });
+});
 
 // Bytes go in as `{ "$bytes": "<base64>" }` and come back from the `json`
 // output format as a bare base64 string, so the two sides get different
