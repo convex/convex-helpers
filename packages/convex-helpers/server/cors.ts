@@ -39,8 +39,7 @@ export type CorsConfig = {
    * With credentials allowed, every origin in `allowedOrigins` can make
    * requests that carry the user's cookies and read the responses. So if you
    * authenticate with cookies, list your frontend's origins there instead of
-   * using "*". Bearer tokens in the `Authorization` header aren't affected,
-   * since browsers don't add those to requests by themselves.
+   * using "*". Note: you don't need this for `Authorization` header auth.
    * @default false
    */
   allowCredentials?: boolean;
@@ -101,9 +100,8 @@ export type CorsHttpRouter = {
  * Factory function to create a router that adds CORS support to routes.
  * @deprecated With `allowCredentials: true` and no `allowedOrigins`, any
  * website can make requests that carry the user's cookies and read the
- * responses. List your frontend's origins in `allowedOrigins`, or pass
- * `["*"]` if any site really may, e.g. when you use bearer tokens rather
- * than cookies.
+ * responses. List your frontend's origins in `allowedOrigins` to allow
+ * cookie-based auth, or `["*"]` if any site really may make requests.
  */
 export function corsRouter(
   http: HttpRouter,

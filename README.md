@@ -1290,7 +1290,7 @@ http.route({
 export default http;
 ```
 
-If you turn on `allowCredentials`, list the origins your frontend runs on in `allowedOrigins`. With `"*"`, any website can make requests that carry the user's cookies and read the responses. That's fine when you authenticate with a bearer token in the `Authorization` header, which browsers don't add to requests by themselves, but not when you use cookies. That's why `allowCredentials` without `allowedOrigins` shows up as deprecated in your editor. Pass `allowedOrigins: ["*"]` if any site really may send credentials.
+If you turn on `allowCredentials`, list the origins your frontend runs on in `allowedOrigins`. With `"*"`, any website can make requests that carry the user's cookies and read the responses. Note: if you authenticate with a bearer token in the `Authorization` header, you do not need `allowCredentials`.
 
 ## Standard Schema
 
