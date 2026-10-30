@@ -123,25 +123,13 @@
       "types": "./dist/server/zod4.d.ts",
       "default": "./dist/server/zod4.js"
     },
-    "./react/*.js": {
-      "types": "./dist/react/*.d.ts",
-      "default": "./dist/react/*.js"
-    },
     "./react/*": {
       "types": "./dist/react/*.d.ts",
       "default": "./dist/react/*.js"
     },
-    "./react/cache/*.js": {
-      "types": "./dist/react/cache/*.d.ts",
-      "default": "./dist/react/cache/*.js"
-    },
     "./react/cache/*": {
       "types": "./dist/react/cache/*.d.ts",
       "default": "./dist/react/cache/*.js"
-    },
-    "./server/*.js": {
-      "types": "./dist/server/*.d.ts",
-      "default": "./dist/server/*.js"
     },
     "./server/*": {
       "types": "./dist/server/*.d.ts",

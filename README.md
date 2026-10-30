@@ -133,7 +133,7 @@ import {
   getOneFromOrThrow,
   getManyFrom,
   getManyViaOrThrow,
-} from "convex-helpers/server/relationships.js";
+} from "convex-helpers/server/relationships";
 import { asyncMap } from "convex-helpers";
 
 const author = await getOneFromOrThrow(db, "authors", "userId", user._id);
