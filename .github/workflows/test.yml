@@ -38,11 +38,23 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import { execFileSync } from 'node:child_process';
-          import { releaseAt } from './scripts/release-plan.mjs';
-          const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-          // On pull_request, HEAD is GitHub's proposed merge with current main.
-          // Ordinary feature PRs may carry notes; a version bump must consume them.
-          if (releaseAt(sha)) execFileSync('npm', ['run', 'release:validate'], { stdio: 'inherit' });
+          import { existsSync, readFileSync, readdirSync } from 'node:fs';
+          // HEAD is GitHub's proposed merge. Only version-bump PRs must consume notes.
+          const before = JSON.parse(execFileSync('git', ['show', 'HEAD^1:package.json'], { encoding: 'utf8' }));
+          const current = JSON.parse(readFileSync('package.json'));
+          if (before.version === current.version) process.exit(0);
+          const { version } = JSON.parse(readFileSync('package.json'));
+          const lines = readFileSync('CHANGELOG.md', 'utf8').split(/\r?\n/);
+          const heading = lines.indexOf(`## ${version}`);
+          const following = heading < 0 ? [] : lines.slice(heading + 1);
+          const end = following.findIndex(line => /^#{1,2} /.test(line));
+          const notes = following.slice(0, end < 0 ? undefined : end).join('\n').trim();
+          if (!notes) throw new Error(`Add release notes under ## ${version} in CHANGELOG.md`);
+          const pending = readdirSync('.changeset').filter(file => file.endsWith('.md') && !/^(README|AGENTS|CLAUDE|GEMINI)\.md$/i.test(file) && !file.startsWith('.'));
+          if (pending.length) throw new Error(`Run npx changeset version to consume pending changesets: ${pending.join(', ')}`);
+          const pre = existsSync('.changeset/pre.json') ? JSON.parse(readFileSync('.changeset/pre.json')) : undefined;
+          if (pre && (pre.mode !== 'pre' || !version.includes(`-${pre.tag}.`))) throw new Error('Finish Changesets prerelease versioning before releasing');
+          if (!pre && existsSync('.changeset/pre') && readdirSync('.changeset/pre').some(file => file.endsWith('.md'))) throw new Error('Consume archived prerelease notes before a stable release');
           JS
 
       - name: Cache Convex local binary
@@ -57,8 +69,7 @@ jobs:
 
       - name: Run lint and test
         run: |
-          npm run lint
-          npm run test
+          npm run check
 
       - name: Run codegen
         env:

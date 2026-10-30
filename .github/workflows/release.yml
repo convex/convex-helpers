@@ -47,7 +47,39 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
           RELEASE_COMMIT: ${{ inputs.commit }}
-        run: node scripts/release-plan.mjs
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync } from 'node:fs';
+          import semver from 'semver';
+          const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+          const manifest = sha => JSON.parse(git('show', `${sha}:package.json`));
+          const { BEFORE, GITHUB_SHA, GITHUB_EVENT_NAME, RELEASE_COMMIT, GITHUB_OUTPUT } = process.env;
+          const requested = GITHUB_EVENT_NAME === 'workflow_dispatch' ? RELEASE_COMMIT || GITHUB_SHA : undefined;
+          const start = requested || BEFORE;
+          if (![start, GITHUB_SHA].every(sha => /^[a-f0-9]{40}$/.test(sha))) throw new Error('Expected full Git commit SHAs');
+          git('merge-base', '--is-ancestor', start, GITHUB_SHA);
+          // Find the version bump itself, even when ordinary commits follow it in a push.
+          const candidates = requested ? [requested] : git('rev-list', '--first-parent', '--reverse', `${BEFORE}..${GITHUB_SHA}`).split('\n').filter(Boolean);
+          const releases = candidates.filter(sha => manifest(sha).version !== manifest(`${sha}^1`).version);
+          if (releases.length > 1) throw new Error('Push one release at a time; use manual dispatch with a specific commit to recover');
+          if (requested && !releases.length) throw new Error('This commit does not bump the version');
+          let release = null;
+          if (releases.length) {
+            const sha = releases[0];
+            const pkg = manifest(sha);
+            const parsed = semver.parse(pkg.version);
+            const canonical = parsed && parsed.version + (parsed.build.length ? `+${parsed.build.join('.')}` : '');
+            if (pkg.name !== 'convex-helpers' || !parsed || pkg.version !== canonical) throw new Error('Invalid release version or package');
+            // Numeric/range-like prerelease identifiers cannot be npm dist-tags.
+            const pre = parsed.prerelease[0];
+            const distTag = pre === undefined ? 'latest' : semver.validRange(String(pre)) ? 'next' : String(pre);
+            const tag = `v${pkg.version}`;
+            if (git('tag', '--list', tag) && git('rev-parse', `refs/tags/${tag}^{commit}`) !== sha) throw new Error('Existing tag identifies a different commit');
+            release = { sha, version: pkg.version, distTag };
+          }
+          appendFileSync(GITHUB_OUTPUT, `release=${JSON.stringify(release)}\n`);
+          JS
 
   build:
     needs: plan
@@ -67,13 +99,28 @@ jobs:
         with:
           node-version-file: ".nvmrc"
           package-manager-cache: false
-      - name: Validate, build, and test the release commit
+      - run: npm ci
+      - name: Validate release notes
         run: |
-          npm ci
-          npm run release:validate
+          node --input-type=module <<'JS'
+          import { existsSync, readFileSync, readdirSync } from 'node:fs';
+          const { version } = JSON.parse(readFileSync('package.json'));
+          const lines = readFileSync('CHANGELOG.md', 'utf8').split(/\r?\n/);
+          const heading = lines.indexOf(`## ${version}`);
+          const following = heading < 0 ? [] : lines.slice(heading + 1);
+          const end = following.findIndex(line => /^#{1,2} /.test(line));
+          const notes = following.slice(0, end < 0 ? undefined : end).join('\n').trim();
+          if (!notes) throw new Error(`Add release notes under ## ${version} in CHANGELOG.md`);
+          const pending = readdirSync('.changeset').filter(file => file.endsWith('.md') && !/^(README|AGENTS|CLAUDE|GEMINI)\.md$/i.test(file) && !file.startsWith('.'));
+          if (pending.length) throw new Error(`Run npx changeset version to consume pending changesets: ${pending.join(', ')}`);
+          const pre = existsSync('.changeset/pre.json') ? JSON.parse(readFileSync('.changeset/pre.json')) : undefined;
+          if (pre && (pre.mode !== 'pre' || !version.includes(`-${pre.tag}.`))) throw new Error('Finish Changesets prerelease versioning before releasing');
+          if (!pre && existsSync('.changeset/pre') && readdirSync('.changeset/pre').some(file => file.endsWith('.md'))) throw new Error('Consume archived prerelease notes before a stable release');
+          JS
+      - name: Build and check
+        run: |
           npm run build
-          npm run lint
-          npm test
+          npm run check
       - name: Pack the tested build without rebuilding
         run: |
           mkdir -p "$RUNNER_TEMP/npm-release"
@@ -147,7 +194,7 @@ jobs:
           const { GH_TOKEN, GITHUB_API_URL, GITHUB_REPOSITORY, VERSION, RELEASE_SHA } = process.env;
           const root = `${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/git`;
           const headers = { Authorization: `Bearer ${GH_TOKEN}`, Accept: 'application/vnd.github+json' };
-          const url = `${root}/ref/tags/npm/${VERSION}`;
+          const url = `${root}/ref/tags/v${VERSION}`;
           const check = async () => {
             const response = await fetch(url, { headers });
             if (response.status === 404) return false;
@@ -165,9 +212,9 @@ jobs:
           if (!await check()) {
             const response = await fetch(`${root}/refs`, {
               method: 'POST', headers,
-              body: JSON.stringify({ ref: `refs/tags/npm/${VERSION}`, sha: RELEASE_SHA }),
+              body: JSON.stringify({ ref: `refs/tags/v${VERSION}`, sha: RELEASE_SHA }),
             });
             if (!response.ok && !await check()) throw new Error(`Creating tag failed: ${response.status}`);
           }
-          console.log(`npm/${VERSION} identifies staged commit ${RELEASE_SHA}. npm approval is still required.`);
+          console.log(`v${VERSION} identifies staged commit ${RELEASE_SHA}. npm approval is still required.`);
           JS
