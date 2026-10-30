@@ -61,9 +61,90 @@ for how to add a version or mark known failures.
 
 ## Releasing
 
-Run `npm run release` for a patch or `npm run alpha` for an alpha release from
-this folder. Stop any running development watcher before releasing.
+From a clean checkout that includes the latest `origin/main`, run:
 
-The existing `publish.sh` checks and publishes the root package, then commits
-its version and lockfile, tags `npm/<version>`, and pushes. Update the root
-`CHANGELOG.md` before releasing. CI publishing is introduced in a separate PR.
+```sh
+npm run release                 # patch; edit the changelog in your Git editor
+npm run release -- minor        # or major / alpha
+npm run release -- --watch      # follow CI and open npm's approval page afterward
+```
+
+Stop development watchers first. The command checks the package, updates the root
+version and lockfile with `npm version --git-tag-version=false`, opens
+`CHANGELOG.md` in your Git editor, commits, and pushes `HEAD` to `main`. It can run
+from any branch containing the current main; the push must be a fast-forward and
+permitted by branch protection. A release PR is optional. If branch protection
+requires a PR, run `npm run release:prepare -- patch`, commit the generated files,
+and open a PR instead.
+
+After pushing, the command prints links to that commit's CI checks and your npm
+Staged Packages page. Finding the personal npm link uses `npm whoami`; signing in
+locally is required to discover that link, but is not used for CI publishing.
+`--watch` requires the GitHub CLI (`gh`) to be installed and authenticated. It follows only the pushed
+commit's Release workflow and opens the approval page after success if `npm whoami`
+succeeded. Otherwise, it still watches CI and prints instructions to sign in on
+npmjs.com and open Settings → Staged Packages manually. The default command
+returns after pushing and printing links.
+
+[The release workflow](./.github/workflows/release.yml) finds the version-bump
+commit in each push to main, including a release followed by ordinary commits in
+the same push. Push one release at a time; multiple version bumps in one push
+are rejected. The release is validated, built, tested, and staged from its
+exact commit with npm trusted publishing and provenance. Prerelease identifiers
+choose the npm dist-tag (`alpha`, `beta`, etc.); identifiers that npm treats as
+version ranges (such as numeric identifiers) use `next`. Stable versions use
+`latest`.
+
+Only pushes to `main` automatically start releases. To stage an alpha from another
+branch, commit its version bump and changelog, push the branch, then explicitly run:
+
+```sh
+gh workflow run release.yml --ref my-alpha-branch
+```
+
+The selected branch tip must change the package version. Use `-f commit=<full-sha>`
+to select an earlier version-bump commit on that branch.
+
+After staging succeeds, a separate tag job creates `npm/<version>` at the release
+commit. It accepts an existing matching tag and refuses to move a conflicting
+tag. **A Git tag means staging succeeded, not that the version is publicly
+available.** Open
+`https://www.npmjs.com/settings/<your-npm-username>/staged-packages`, review the
+version, and approve with npm 2FA. Alternatively, the staging log prints the ID
+for `npm stage approve <stage-id>`. Approval is the last step: no local Git
+operation or finalization workflow follows it. If several versions await
+approval, approve in version order so an older release does not replace `latest`.
+
+### One-time setup
+
+Configure the npm trusted publisher for package `convex-helpers`, GitHub
+repository `convex/convex-helpers`, workflow `release.yml`, with **only staged
+publishing allowed**. Disable direct publishing for the trust relationship and
+remove CI tokens that can bypass human approval. The npm-side restriction keeps
+a rogue workflow change from turning a push into a public release without 2FA.
+The workflow uses the npm bundled with the Node version in `.nvmrc`: Node
+24.18.0 includes npm 11.16.0, meeting the npm 11.15.0 minimum for staged
+publishing. GitHub Actions also needs permission to create `npm/*` tags under
+the repository's rulesets.
+
+### Failures and retries
+
+- If the local push fails, the release commit is retained. Reconcile with main,
+  then push that commit; do not rerun the version bump. If preparation fails,
+  inspect and finish or discard its uncommitted changes before trying again.
+- If checks or staging fail, inspect the log. Re-run the failed jobs for a
+  transient failure. The manual Release workflow also accepts the full SHA of a
+  version-bump commit on the selected ref, defaulting to that ref's tip.
+- If only tagging fails, **re-run failed jobs**, which reuses the successful
+  staging job. Do not rerun the entire workflow: npm rejects an already-staged or
+  published version. Registry/authentication errors are failures, not silently
+  treated as duplicate uploads.
+- If npm accepted the upload but the runner lost its response, inspect the npm
+  staging page before retrying. Do not delete tags or blindly upload again.
+  Recover the tag at the original commit after verifying the staged artifact.
+- Rejected candidates keep their Git tags. Ship corrections as a new version;
+  never move a tag to represent different source.
+
+Direct publishing could later replace `npm stage publish` with `npm publish`
+(and change the npm trust permissions). Tagging would still follow a successful
+upload; the human npm approval step would disappear.
