@@ -8,13 +8,9 @@ Run the following command in the _root_ of the repository (not `packages/convex-
 npm install
 ```
 
-The root `package.json` is the publishable package and contains all development
-dependencies. Package sources stay in `packages/convex-helpers/`; `npm run build`
-compiles them directly into root `dist/` and bundles the CLI as `dist/bin.cjs`.
-The examples import `convex-helpers` through the root package's exports, so run
-`npm run build` before typechecking or running tests. `npm run dev` builds first
-and watches the package sources for changes. The frontend and its Vite config live
-in `example-ui/`; Vite loads the repository root's `.env.local` for `VITE_CONVEX_URL`.
+Run `npm run build` before typechecking or running tests. Use `npm run dev`
+for local development. See [package.json](./package.json) for available scripts
+and [example-ui/README.md](./example-ui/README.md) for the frontend example.
 
 ## Adding a helper
 
@@ -24,33 +20,27 @@ Adding helpers usually involves:
    - `server/` if it helps write server-side code (imported in `convex/`).
    - `react/` for React client-side code.
    - The package source root if it can be imported client or server-side.
-2. Adding an explicit entry to `exports` in [the root package.json](./package.json),
-   pointing `types` at `./dist/<path>.d.ts` and `default` at `./dist/<path>.js`.
-   Entrypoints are maintained manually. The build and watcher already include
-   TypeScript files under the package source directory.
+2. Adding an entry to `exports` in [package.json](./package.json), following the
+   existing entries.
 3. Adding usage documentation to the [package README](./README.md).
 4. Adding an example in `convex/fooExample.ts` or `example-ui/src/components/FooExample.tsx`.
 5. Writing a [Stack](https://stack.convex.dev) post explaining the problem and
    how the helper solves it, then linking it from the README.
 
-## Checking the package and examples
+## Checking changes
 
-- `npm run build`: compile the library and CLI into `dist/`.
-- `npm run build && npx vite build --config example-ui/vite.config.mts`: build
-  the library and frontend. Frontend hosting should use this command and serve
-  `example-ui/dist/`.
-- `npm run typecheck` and `npm test`: check the package and example usage.
-- `npm pack` (or `npm run pack`): clean, build, and create the publishable tarball
-  from the repository root. The `files` allowlist includes compiled output and
-  package sources for declaration maps; tests and configuration are excluded.
+```sh
+npm run build
+npm run check
+```
 
-## Testing the Zod helpers against several Zod versions
+For a frontend change, also run `npx vite build --config example-ui/vite.config.mts`.
+Use `npm pack` to inspect the package tarball.
 
-The Zod tests run, and are typechecked, against several Zod 4 versions: one per
-`zod-4.<minor>` alias in [the root package.json](./package.json). Run a single
-version with `npx vitest run --project zod-4.2` and typecheck every version with
-`npm run typecheck:zod`. See [`scripts/zodVersions.mjs`](./scripts/zodVersions.mjs)
-for how to add a version or mark known failures.
+For Zod compatibility tests, run a single version with
+`npx vitest run --project zod-4.2`, or typecheck all supported versions with
+`npm run typecheck:zod`. See [scripts/zodVersions.mjs](./scripts/zodVersions.mjs)
+for adding a version or marking known failures.
 
 ## Recommendations
 
@@ -61,32 +51,26 @@ for how to add a version or mark known failures.
 
 ## Releasing
 
-Add release notes alongside package changes with `npx changeset`. Choose the
-version bump and describe the user-visible change, then commit the generated
-`.changeset/*.md` file with your implementation. Docs-only and development-tooling
-changes do not need a changeset.
+Add a release note with `npx changeset`: choose the version bump, describe the
+user-visible change, and commit the generated file with your implementation.
+Docs-only and development-tooling changes do not need a changeset.
 
-[The release-PR workflow](./.github/workflows/version.yml) runs on pushes to main.
-When changesets are pending, it runs the build and checks, then uses Changesets to
-create or update a single **Prepare next release** PR from `changeset-release/main`.
-Review and merge it when ready to release; later changesets update the same PR.
-Creating or updating this PR does not stage or publish a package. Once merged,
-the existing release workflow stages the landed version and npm approval is still
-required.
+Review and merge the release PR when ready. Click **Approve workflows to run**
+on the PR if its checks are waiting for approval. To refresh it manually, run the
+[Release PR workflow](./.github/workflows/version.yml) on main.
 
-This uses the built-in `GITHUB_TOKEN`, with no additional secrets. In repository
-**Settings → Actions → General**, enable **Allow GitHub Actions to create and
-approve pull requests**. For bot-created or updated PRs, a maintainer must click
-**Approve workflows to run** in the PR before its checks run. This approval is
-separate from reviewing/merging the PR and approving the staged package on npm.
-See [GitHub's workflow-trigger rules](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
+After staging, review the package under **Settings → Staged Packages** on
+[npm](https://www.npmjs.com) and approve with 2FA, or use
+`npm stage approve <stage-id>` with the ID from the workflow log. Approve versions
+in order to avoid moving `latest` backward.
 
-To refresh the PR manually, run the **Release PR** workflow on main. Forks skip
-this workflow until their maintainer changes its repository guard. The workflow
-uses only Changesets' versioning actions; it does not run its publishing action
-or create Git tags.
+See [version.yml](./.github/workflows/version.yml) for PR automation and
+[release.yml](./.github/workflows/release.yml) for release selection, checks,
+staging, and tagging.
 
-You can also prepare a release locally from an up-to-date checkout:
+### Local preparation and alphas
+
+To prepare a release locally instead of using the bot:
 
 ```sh
 npm ci
@@ -95,77 +79,25 @@ npm run check
 npx changeset version
 ```
 
-Review the version and changelog, then commit the root `package.json`,
-`CHANGELOG.md`, and consumed `.changeset/` files. Land that commit through a PR,
-or push it directly to main where repository rules permit. The local Changesets
-command does not commit, push, or tag for you. There is no release wrapper.
-Package-lock version metadata does not need to match the package version;
-update the lockfile normally when dependencies change.
+Review and commit the version, changelog, and consumed changesets. Land the commit
+through a PR, or push to main where repository rules permit.
 
-[The release workflow](./.github/workflows/release.yml) finds the last version-bump
-commit in each push to main, including a release followed by ordinary commits in
-the same push. If several versions occur in one push, only the last is staged;
-intermediate versions are skipped. CI checks for pending changesets, builds,
-checks, and packs that exact commit, then stages the tarball using npm trusted
-publishing and provenance. Installation and package scripts run without OIDC
-permission; a separate staging job uploads the tarball with scripts disabled.
-Caching is disabled throughout the release workflow.
-
-PRs introducing a new release reject unconsumed changesets on the proposed merge, and the
-release workflow repeats this check on the exact release commit. If newer notes
-land before your release, rerun `npx changeset version` to include them. Notes
-landing after the release commit belong to the next release. No merge queue is
-required, but without one a race may only be caught after landing, blocking staging.
-Changesets generates the changelog; CI does not enforce its formatting or inspect
-its contents. Changelog corrections can be committed afterward.
-
-After staging succeeds, CI creates `v<version>` at the release commit without
-moving an existing tag. **The tag records successful staging, not public
-availability.** Open Settings → Staged Packages on [npm](https://www.npmjs.com),
-review the package, and approve with 2FA. The direct page is
-`https://www.npmjs.com/settings/<your-npm-username>/staged-packages`; alternatively,
-the staging log supplies the ID for `npm stage approve <stage-id>`. Approval is
-the final step. Approve pending versions in order so an older release does not
-replace `latest`.
-
-### Alphas and manual runs
-
-Only pushes to `main` automatically start releases. Opening or updating a PR,
-including a Changesets release PR, does not. For a branch alpha, use Changesets'
-standard `npx changeset pre enter alpha` and `npx changeset version`, commit and
-push the generated files, then explicitly run:
+For an alpha, follow [Changesets' prerelease instructions](https://changesets.dev/guide/prereleases),
+commit and push the version changes, then run:
 
 ```sh
 gh workflow run release.yml --ref my-alpha-branch
 ```
 
-The selected tip must change the version. To stage an earlier version-bump commit
-on that ref, add `-f commit=<full-sha>`. The workflow must already exist on the
-default branch for dispatch to be available. Stable versions use `latest`;
-prereleases use their identifier (`alpha`, `beta`, etc.), or `next` if that
-identifier is an npm version range. For subsequent alphas, add changesets and run
-`npx changeset version` again. Use `npx changeset pre exit` followed by
-`npx changeset version` when preparing a stable release on main.
+To retry an earlier version-bump commit on the selected ref, add
+`-f commit=<full-sha>`.
 
-An alpha branch can merge into main without another version bump. If its version
-already has a `v<version>` tag from successful staging, automatic releases skip
-it, including after a merge or squash changes the commit SHA. Its existing tag
-continues to identify the original staged source. The merge can carry pending
-changesets for the next release. An untagged alpha landing on main automatically
-stages that alpha, with the same pending-changeset check as any new release.
-You only need to exit prerelease mode and version again when you want a stable
-release; merging alone does not require it.
+### Setup and recovery
 
-### Failures and retries
+In repository **Settings → Actions → General**, enable **Allow GitHub Actions to
+create and approve pull requests**. See [GitHub's workflow-trigger rules](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)
+for approving checks on bot-created PRs.
 
-- For transient check or staging failures, rerun failed jobs. Manual dispatch can
-  also retry a specific version-bump commit on the selected ref.
-- If tagging alone fails, rerun **failed jobs**, preserving the successful staging
-  job. Rerunning everything attempts to upload the already-reserved version again.
-- If npm accepted the upload but the runner lost the response, inspect npm before
-  retrying, and recover the tag at the original commit after verifying the artifact.
-- If a release needs code changes, land a new version. Rejected staged candidates
-  keep their tags; never move a tag to represent different source.
-
-Direct publishing could later replace `npm stage publish` with `npm publish`
-and change npm trust permissions. Tagging would still follow a successful upload.
+Retry **failed jobs** rather than the entire workflow when staging has already
+succeeded. If an upload's outcome is uncertain, inspect npm before retrying. If
+fixing a release requires code changes, prepare a new version.
