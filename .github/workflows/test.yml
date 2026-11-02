@@ -96,8 +96,21 @@ jobs:
       - name: Check whether a version PR is needed
         id: mode
         uses: changesets/action/select-mode@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
-      - name: Create or update the release PR
+      - name: Check main is still at the tested commit
         if: steps.mode.outputs.mode == 'version'
+        id: freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          main_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$main_sha" == "$GITHUB_SHA" ]]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping release PR update: main has moved beyond this run's commit."
+          fi
+      - name: Create or update the release PR
+        if: steps.mode.outputs.mode == 'version' && steps.freshness.outputs.current == 'true'
         uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           github-token: ${{ github.token }}
