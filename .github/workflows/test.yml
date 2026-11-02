@@ -1,13 +1,15 @@
 name: Test and lint
+# Serialize main runs through PR creation; superseded PR checks can be cancelled.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: ["**"]
+  workflow_dispatch:
 
 permissions: {}
 
@@ -69,3 +71,36 @@ jobs:
         run: |
           npx convex dev --once
           git diff --exit-code convex/_generated
+
+  version:
+    name: Update release PR
+    needs: check
+    if: github.repository_owner == 'convex' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Version the same commit that passed the check job.
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ".nvmrc"
+          package-manager-cache: false
+      - run: npm ci
+      - name: Check whether a version PR is needed
+        id: mode
+        uses: changesets/action/select-mode@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+      - name: Create or update the release PR
+        if: steps.mode.outputs.mode == 'version'
+        uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          github-token: ${{ github.token }}
+          pr-title: "Prepare next release"
+          commit-message: "Version packages"
+          pr-base-branch: main

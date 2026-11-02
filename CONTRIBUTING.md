@@ -57,14 +57,14 @@ Docs-only and development-tooling changes do not need a changeset.
 
 Review and merge the release PR when ready. Click **Approve workflows to run**
 on the PR if its checks are waiting for approval. To refresh it manually, run the
-[Release PR workflow](./.github/workflows/version.yml) on main.
+[Test and lint workflow](./.github/workflows/test.yml) on main.
 
 After staging, review the package under **Settings → Staged Packages** on
 [npm](https://www.npmjs.com) and approve with 2FA, or use
 `npm stage approve <stage-id>` with the ID from the workflow log. Approve versions
 in order to avoid moving `latest` backward.
 
-See [version.yml](./.github/workflows/version.yml) for PR automation and
+See [test.yml](./.github/workflows/test.yml) for PR automation and
 [release.yml](./.github/workflows/release.yml) for release selection, checks,
 staging, and tagging.
 
