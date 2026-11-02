@@ -82,19 +82,22 @@ commit, push, or tag for you. There is no release wrapper or automatic release-P
 bot. Package-lock version metadata does not need to match the package version;
 update the lockfile normally when dependencies change.
 
-[The release workflow](./.github/workflows/release.yml) finds the version-bump
+[The release workflow](./.github/workflows/release.yml) finds the last version-bump
 commit in each push to main, including a release followed by ordinary commits in
-the same push. Push one release at a time. CI validates the release notes, builds,
+the same push. If several versions occur in one push, only the last is staged;
+intermediate versions are skipped. CI checks for pending changesets, builds,
 checks, and packs that exact commit, then stages the tarball using npm trusted
 publishing and provenance. Installation and package scripts run without OIDC
 permission; a separate staging job uploads the tarball with scripts disabled.
 Caching is disabled throughout the release workflow.
 
-Release PR checks reject unconsumed changesets on the proposed merge, and the
+PRs introducing a new release reject unconsumed changesets on the proposed merge, and the
 release workflow repeats this check on the exact release commit. If newer notes
 land before your release, rerun `npx changeset version` to include them. Notes
 landing after the release commit belong to the next release. No merge queue is
 required, but without one a race may only be caught after landing, blocking staging.
+Changesets generates the changelog; CI does not enforce its formatting or inspect
+its contents. Changelog corrections can be committed afterward.
 
 After staging succeeds, CI creates `v<version>` at the release commit without
 moving an existing tag. **The tag records successful staging, not public
@@ -123,6 +126,15 @@ prereleases use their identifier (`alpha`, `beta`, etc.), or `next` if that
 identifier is an npm version range. For subsequent alphas, add changesets and run
 `npx changeset version` again. Use `npx changeset pre exit` followed by
 `npx changeset version` when preparing a stable release on main.
+
+An alpha branch can merge into main without another version bump. If its version
+already has a `v<version>` tag from successful staging, automatic releases skip
+it, including after a merge or squash changes the commit SHA. Its existing tag
+continues to identify the original staged source. The merge can carry pending
+changesets for the next release. An untagged alpha landing on main automatically
+stages that alpha, with the same pending-changeset check as any new release.
+You only need to exit prerelease mode and version again when you want a stable
+release; merging alone does not require it.
 
 ### Failures and retries
 
