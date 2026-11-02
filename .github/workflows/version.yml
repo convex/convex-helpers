@@ -1,0 +1,50 @@
+name: Release PR
+
+# Prepare versions only. Merging the PR triggers staging in release.yml.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  version:
+    if: github.repository == 'convex/convex-helpers' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Refresh from current main even when this run waited behind another.
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ".nvmrc"
+          package-manager-cache: false
+      - run: npm ci
+      - name: Check whether a version PR is needed
+        id: mode
+        uses: changesets/action/select-mode@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+      - name: Build and check before versioning
+        if: steps.mode.outputs.mode == 'version'
+        run: |
+          npm run build
+          npm run check
+      - name: Create or update the release PR
+        if: steps.mode.outputs.mode == 'version'
+        uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          github-token: ${{ github.token }}
+          pr-title: "Prepare next release"
+          commit-message: "Version packages"
+          pr-base-branch: main

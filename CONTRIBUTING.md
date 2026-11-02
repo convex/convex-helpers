@@ -66,7 +66,27 @@ version bump and describe the user-visible change, then commit the generated
 `.changeset/*.md` file with your implementation. Docs-only and development-tooling
 changes do not need a changeset.
 
-To prepare a release from an up-to-date checkout:
+[The release-PR workflow](./.github/workflows/version.yml) runs on pushes to main.
+When changesets are pending, it runs the build and checks, then uses Changesets to
+create or update a single **Prepare next release** PR from `changeset-release/main`.
+Review and merge it when ready to release; later changesets update the same PR.
+Creating or updating this PR does not stage or publish a package. Once merged,
+the existing release workflow stages the landed version and npm approval is still
+required.
+
+This uses the built-in `GITHUB_TOKEN`, with no additional secrets. In repository
+**Settings → Actions → General**, enable **Allow GitHub Actions to create and
+approve pull requests**. For bot-created or updated PRs, a maintainer must click
+**Approve workflows to run** in the PR before its checks run. This approval is
+separate from reviewing/merging the PR and approving the staged package on npm.
+See [GitHub's workflow-trigger rules](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
+
+To refresh the PR manually, run the **Release PR** workflow on main. Forks skip
+this workflow until their maintainer changes its repository guard. The workflow
+uses only Changesets' versioning actions; it does not run its publishing action
+or create Git tags.
+
+You can also prepare a release locally from an up-to-date checkout:
 
 ```sh
 npm ci
@@ -77,9 +97,9 @@ npx changeset version
 
 Review the version and changelog, then commit the root `package.json`,
 `CHANGELOG.md`, and consumed `.changeset/` files. Land that commit through a PR,
-or push it directly to main where repository rules permit. Changesets does not
-commit, push, or tag for you. There is no release wrapper or automatic release-PR
-bot. Package-lock version metadata does not need to match the package version;
+or push it directly to main where repository rules permit. The local Changesets
+command does not commit, push, or tag for you. There is no release wrapper.
+Package-lock version metadata does not need to match the package version;
 update the lockfile normally when dependencies change.
 
 [The release workflow](./.github/workflows/release.yml) finds the last version-bump
