@@ -4,7 +4,7 @@
 
 ### Patch Changes
 
-- `open-api-spec` renders unions as `anyOf`, so a value matching more than one member [#1031](https://github.com/convex/convex-helpers/pull/1031)
+- `open-api-spec` renders unions as `anyOf`, so a value matching more than one member
   validates. It also supports `v.bytes()` instead of aborting with "bytes unsupported".
 
 ## 0.1.133
