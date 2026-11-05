@@ -37,10 +37,13 @@ npm run check
 For a frontend change, also run `npx vite build --config example-ui/vite.config.mts`.
 Use `npm pack` to inspect the package tarball.
 
-For Zod compatibility tests, run a single version with
-`npx vitest run --project zod-4.2`, or typecheck all supported versions with
-`npm run typecheck:zod`. See [scripts/zodVersions.mjs](./scripts/zodVersions.mjs)
-for adding a version or marking known failures.
+### Working on Zod helpers
+
+When working on Zod compatibility, you can run tests for a single version with
+`npx vitest run --project zod-4.2`, or run just the compatibility typechecks with
+`npm run typecheck:zod`. These are optional commands for focused development.
+See [scripts/zodVersions.mjs](./scripts/zodVersions.mjs) for adding a version or
+marking known failures.
 
 ## Recommendations
 
@@ -94,6 +97,9 @@ To retry an earlier version-bump commit on the selected ref, add
 
 ### Recovery
 
-Retry **failed jobs** rather than the entire workflow when staging has already
-succeeded. If an upload's outcome is uncertain, inspect npm before retrying. If
-fixing a release requires code changes, prepare a new version.
+| Situation                                                                                      | Action                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Transient failure before uploading to npm                                                      | Re-run **failed jobs** for the same release commit.                                                                                                                                                  |
+| Staging succeeded, but tagging failed                                                          | Re-run **failed jobs** to retry tagging. Re-running all jobs would attempt to upload the same version again and may fail before reaching tagging.                                                    |
+| The upload failed, but npm may have received it                                                | Check npm's staged packages and published versions. If absent, retry the failed jobs. If present, verify its source commit and create any missing Git tag on that commit instead of uploading again. |
+| Fixing the failure requires changing the release commit, such as consuming leftover changesets | Merge the fix with a new version bump, even if the failed version was never published. Keep the original release commit intact; retrying it would repeat the same failure.                           |
