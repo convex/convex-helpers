@@ -70,17 +70,8 @@ in the Markdown body. The GitHub changelog generator turns references such as
 Fix cursor handling when resuming pagination (#1234).
 ```
 
-Keep the package/version frontmatter as generated; write the summary in the body,
-without a leading bullet. Changesets preserves this Markdown in the
-changelog. Include `Fixes #1234` in the implementation PR's description to close
-the issue when that PR merges. Optional contributor credits can be written as
-Markdown links in the summary; they are not added automatically.
-
-The official `@changesets/changelog-github` generator is configured to show the
-summary and PR link, without commit hashes or automatic contributor thanks.
-Changesets' standard **Patch Changes**, **Minor Changes**, and **Major Changes**
-headings remain. The generator is pinned to an exact version because its template
-option is experimental.
+Write the summary in the body, without a leading bullet.
+Optional contributor credits can be written as Markdown links in the summary.
 
 Review and merge the release PR when ready. Click **Approve workflows to run**
 on the PR if its checks are waiting for approval. To refresh it manually, run the
