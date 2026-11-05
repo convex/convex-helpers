@@ -1,7 +1,8 @@
 name: Changeset reminder
 
 on:
-  pull_request_target:
+  # Needed to comment on fork PRs; PR inspection and commenting use separate jobs.
+  pull_request_target: # zizmor: ignore[dangerous-triggers] -- no PR code runs; see the base checkout note below
     types: [opened, synchronize, reopened]
 
 permissions: {}
@@ -12,6 +13,7 @@ concurrency:
 
 jobs:
   status:
+    if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
