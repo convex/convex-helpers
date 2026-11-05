@@ -1,0 +1,46 @@
+name: Changeset reminder
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      comment-body: ${{ steps.status.outputs.comment-body }}
+    steps:
+      # Use the base branch. The action reads PR files in a temporary worktree;
+      # no PR code or dependency installation runs with pull_request_target.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Generate changeset status
+        id: status
+        uses: changesets/action/pr-status@22ccf9aa43179fe9e27dc62e575971d28cce197c # v2.0.0
+
+  comment:
+    needs: status
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Create or update the reminder
+        uses: changesets/action/pr-comment@22ccf9aa43179fe9e27dc62e575971d28cce197c # v2.0.0
+        with:
+          body: |
+            ${{ needs.status.outputs.comment-body }}
+
+            This is a reminder, not a merge requirement. Docs-only changes, development
+            dependencies, release scripts, and example code do not need a changeset.
+            For package changes, run `npx changeset` and describe the user-visible change.
