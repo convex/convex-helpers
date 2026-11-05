@@ -151,17 +151,12 @@
     "build:bin": "esbuild packages/convex-helpers/cli/index.ts --bundle --platform=node --external:prettier --format=cjs --outfile=dist/bin.cjs",
     "clean": "rm -rf dist example-ui/dist",
     "pack": "npm pack",
-    "test": "vitest run && npm run test:release",
+    "test": "vitest run",
     "test:watch": "vitest",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
-    "alpha": "npm run release -- alpha",
-    "release": "node scripts/release.mjs",
     "prepack": "npm run clean && npm run build",
-    "release:prepare": "node scripts/prepare-release.mjs",
-    "release:validate": "node scripts/validate-release.mjs",
-    "release:check": "npm run clean && npm ci && npm run build && npm run lint && npm test",
-    "test:release": "node --test scripts/*.test.mjs"
+    "check": "npm run lint && npm test"
   },
   "repository": {
     "type": "git",
@@ -216,6 +211,7 @@
     "CHANGELOG.md"
   ],
   "devDependencies": {
+    "@changesets/cli": "3.0.3",
     "@convex-dev/eslint-plugin": "5.0.0",
     "@edge-runtime/vm": "5.0.0",
     "@eslint/js": "9.39.5",

@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Node setup
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -31,6 +32,22 @@ jobs:
         run: |
           npm ci
           npm run build
+
+      - name: Validate release PR
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, readdirSync } from 'node:fs';
+          // HEAD is GitHub's proposed merge. Only new releases must consume notes.
+          const before = JSON.parse(execFileSync('git', ['show', 'HEAD^1:package.json'], { encoding: 'utf8' }));
+          const current = JSON.parse(readFileSync('package.json'));
+          if (before.version === current.version) process.exit(0);
+          // Merging an already-staged alpha is not another release.
+          if (execFileSync('git', ['tag', '--list', `v${current.version}`], { encoding: 'utf8' }).trim()) process.exit(0);
+          const pending = readdirSync('.changeset').filter(file => file.endsWith('.md') && !/^(README|AGENTS|CLAUDE|GEMINI)\.md$/i.test(file) && !file.startsWith('.'));
+          if (pending.length) throw new Error(`Run npx changeset version to consume pending changesets: ${pending.join(', ')}`);
+          JS
 
       - name: Cache Convex local binary
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
@@ -44,8 +61,7 @@ jobs:
 
       - name: Run lint and test
         run: |
-          npm run lint
-          npm run test
+          npm run check
 
       - name: Run codegen
         env:

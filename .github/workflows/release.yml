@@ -47,7 +47,44 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
           RELEASE_COMMIT: ${{ inputs.commit }}
-        run: node scripts/release-plan.mjs
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync } from 'node:fs';
+          import semver from 'semver';
+          const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+          const manifest = sha => JSON.parse(git('show', `${sha}:package.json`));
+          const { BEFORE, GITHUB_SHA, GITHUB_EVENT_NAME, RELEASE_COMMIT, GITHUB_OUTPUT } = process.env;
+          const requested = GITHUB_EVENT_NAME === 'workflow_dispatch' ? RELEASE_COMMIT || GITHUB_SHA : undefined;
+          const start = requested || BEFORE;
+          if (![start, GITHUB_SHA].every(sha => /^[a-f0-9]{40}$/.test(sha))) throw new Error('Expected full Git commit SHAs');
+          if (requested) git('merge-base', '--is-ancestor', requested, GITHUB_SHA);
+          // Use the last version change, even when ordinary commits follow it.
+          const candidates = requested ? [requested] : git('rev-list', '--first-parent', '--reverse', `${BEFORE}..${GITHUB_SHA}`).split('\n').filter(Boolean);
+          const releases = candidates.filter(sha => manifest(sha).version !== manifest(`${sha}^1`).version);
+          if (requested && !releases.length) throw new Error('This commit does not bump the version');
+          let release = null;
+          if (releases.length) {
+            const sha = releases.at(-1);
+            const pkg = manifest(sha);
+            const parsed = semver.parse(pkg.version);
+            const canonical = parsed && parsed.version + (parsed.build.length ? `+${parsed.build.join('.')}` : '');
+            if (!parsed || pkg.version !== canonical) throw new Error('Invalid release version');
+            // Numeric/range-like prerelease identifiers cannot be npm dist-tags.
+            const pre = parsed.prerelease[0];
+            const distTag = pre === undefined ? 'latest' : semver.validRange(String(pre)) ? 'next' : String(pre);
+            const tag = `v${pkg.version}`;
+            const tagged = git('tag', '--list', tag);
+            if (!requested && tagged) {
+              // A branch release may land later with a different merge/squash SHA.
+              console.log(`${tag} was already staged; skipping automatic release`);
+            } else {
+              if (tagged && git('rev-parse', `refs/tags/${tag}^{commit}`) !== sha) throw new Error('Existing tag identifies a different commit');
+              release = { sha, name: pkg.name, version: pkg.version, distTag };
+            }
+          }
+          appendFileSync(GITHUB_OUTPUT, `release=${JSON.stringify(release)}\n`);
+          JS
 
   build:
     needs: plan
@@ -67,13 +104,18 @@ jobs:
         with:
           node-version-file: ".nvmrc"
           package-manager-cache: false
-      - name: Validate, build, and test the release commit
+      - run: npm ci
+      - name: Check for pending changesets
         run: |
-          npm ci
-          npm run release:validate
+          node --input-type=module <<'JS'
+          import { readdirSync } from 'node:fs';
+          const pending = readdirSync('.changeset').filter(file => file.endsWith('.md') && !/^(README|AGENTS|CLAUDE|GEMINI)\.md$/i.test(file) && !file.startsWith('.'));
+          if (pending.length) throw new Error(`Run npx changeset version to consume pending changesets: ${pending.join(', ')}`);
+          JS
+      - name: Build and check
+        run: |
           npm run build
-          npm run lint
-          npm test
+          npm run check
       - name: Pack the tested build without rebuilding
         run: |
           mkdir -p "$RUNNER_TEMP/npm-release"
@@ -114,11 +156,12 @@ jobs:
         working-directory: ${{ runner.temp }}/npm-release
         env:
           DIST_TAG: ${{ fromJSON(needs.plan.outputs.release).distTag }}
+          PACKAGE_NAME: ${{ fromJSON(needs.plan.outputs.release).name }}
           VERSION: ${{ fromJSON(needs.plan.outputs.release).version }}
           RELEASE_SHA: ${{ fromJSON(needs.plan.outputs.release).sha }}
         run: |
           {
-            echo "## convex-helpers@$VERSION"
+            echo "## $PACKAGE_NAME@$VERSION"
             echo "Source: $RELEASE_SHA; npm dist-tag: $DIST_TAG."
             echo 'After this step succeeds, open Settings → Staged Packages on https://www.npmjs.com and approve with 2FA.'
             echo 'The log below contains the stage ID to run: npm stage approve <stage-id>.'
@@ -126,7 +169,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           # npm provenance otherwise records the event SHA, which may be newer
           # than the release commit (or different when retrying an older release).
-          GITHUB_SHA="$RELEASE_SHA" npm stage publish "./convex-helpers-$VERSION.tgz" --ignore-scripts --provenance --tag "$DIST_TAG"
+          GITHUB_SHA="$RELEASE_SHA" npm stage publish ./*.tgz --ignore-scripts --provenance --tag "$DIST_TAG"
 
   tag:
     needs: [plan, stage]
@@ -147,7 +190,7 @@ jobs:
           const { GH_TOKEN, GITHUB_API_URL, GITHUB_REPOSITORY, VERSION, RELEASE_SHA } = process.env;
           const root = `${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/git`;
           const headers = { Authorization: `Bearer ${GH_TOKEN}`, Accept: 'application/vnd.github+json' };
-          const url = `${root}/ref/tags/npm/${VERSION}`;
+          const url = `${root}/ref/tags/v${VERSION}`;
           const check = async () => {
             const response = await fetch(url, { headers });
             if (response.status === 404) return false;
@@ -165,9 +208,9 @@ jobs:
           if (!await check()) {
             const response = await fetch(`${root}/refs`, {
               method: 'POST', headers,
-              body: JSON.stringify({ ref: `refs/tags/npm/${VERSION}`, sha: RELEASE_SHA }),
+              body: JSON.stringify({ ref: `refs/tags/v${VERSION}`, sha: RELEASE_SHA }),
             });
             if (!response.ok && !await check()) throw new Error(`Creating tag failed: ${response.status}`);
           }
-          console.log(`npm/${VERSION} identifies staged commit ${RELEASE_SHA}. npm approval is still required.`);
+          console.log(`v${VERSION} identifies staged commit ${RELEASE_SHA}. npm approval is still required.`);
           JS
