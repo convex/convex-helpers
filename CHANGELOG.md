@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.134
+
+### Patch Changes
+
+- `open-api-spec` renders unions as `anyOf`, so a value matching more than one member [#1031](https://github.com/convex/convex-helpers/pull/1031)
+  validates. It also supports `v.bytes()` instead of aborting with "bytes unsupported".
+
 ## 0.1.133
 
 - Zod 4 support: when a `z.object()` schema is passed as `args` to
