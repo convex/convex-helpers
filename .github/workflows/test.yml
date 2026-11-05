@@ -92,7 +92,7 @@ jobs:
         with:
           node-version-file: ".nvmrc"
           package-manager-cache: false
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Check whether a version PR is needed
         id: mode
         uses: changesets/action/select-mode@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
