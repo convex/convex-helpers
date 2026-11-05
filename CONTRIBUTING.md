@@ -59,30 +59,28 @@ user-visible change, and commit the generated file with your implementation.
 Docs-only and development-tooling changes do not need a changeset.
 
 Edit the generated `.changeset/*.md` file to include relevant issue or PR links
-and optional contributor credits in the Markdown body. Use full links so they
-also work outside GitHub. For example:
+in the Markdown body. The GitHub changelog generator turns references such as
+`#1234` into links and adds the implementation PR link automatically. For example:
 
 ```md
 ---
 "convex-helpers": patch
 ---
 
-Fix cursor handling when resuming pagination
-([#1234](https://github.com/convex/convex-helpers/issues/1234)).
-Thanks to [@contributor](https://github.com/contributor) for the fix!
+Fix cursor handling when resuming pagination (#1234).
 ```
 
-Keep the package/version frontmatter as generated; put links and credits in the
-body, without a leading bullet. Changesets preserves this Markdown in the
+Keep the package/version frontmatter as generated; write the summary in the body,
+without a leading bullet. Changesets preserves this Markdown in the
 changelog. Include `Fixes #1234` in the implementation PR's description to close
-the issue when that PR merges. Changelog links and credits are written by the
-author or reviewer, rather than inferred from commit authors or GitHub metadata.
+the issue when that PR merges. Optional contributor credits can be written as
+Markdown links in the summary; they are not added automatically.
 
-Release notes appear directly under the version heading, without a **Patch
-Changes** heading or automatic commit hashes. Minor and major headings remain to
-highlight larger changes. The release bot uses `npm run version-packages`, which
-runs Changesets and removes the patch heading from the new entry. Use this command
-for local versioning too; `npx changeset version` alone still adds that heading.
+The official `@changesets/changelog-github` generator is configured to show the
+summary and PR link, without commit hashes or automatic contributor thanks.
+Changesets' standard **Patch Changes**, **Minor Changes**, and **Major Changes**
+headings remain. The generator is pinned to an exact version because its template
+option is experimental.
 
 Review and merge the release PR when ready. Click **Approve workflows to run**
 on the PR if its checks are waiting for approval. To refresh it manually, run the
@@ -105,14 +103,18 @@ To prepare a release locally instead of using the bot:
 npm ci
 npm run build
 npm run check
-npm run version-packages
+GITHUB_TOKEN="$(gh auth token)" npx changeset version
 ```
 
 Review and commit the version, changelog, and consumed changesets. Land the commit
 through a PR, or push to main where repository rules permit.
 
+The GitHub generator needs `GITHUB_TOKEN` to look up PR metadata. The release bot
+receives it from GitHub Actions; locally, the command above uses your GitHub CLI
+login. You can also supply `GITHUB_TOKEN` through your environment.
+
 For an alpha, follow [Changesets' prerelease instructions](https://changesets.dev/guide/prereleases),
-using `npm run version-packages` for the version step. Commit and push the version
+providing `GITHUB_TOKEN` for the version step as above. Commit and push the version
 changes, then run:
 
 ```sh
