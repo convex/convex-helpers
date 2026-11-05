@@ -23,6 +23,7 @@ export default [
       "setup.cjs",
       "**/_generated/",
       ".claude/**",
+      ".context/**",
       "example-ui/vite.config.mts",
       "vitest.config.mts",
       "vitest.workspace.ts",
@@ -42,7 +43,11 @@ export default [
       parser: tseslint.parser,
 
       parserOptions: {
-        project: ["./tsconfig.json", "./packages/convex-helpers/tsconfig.json"],
+        project: [
+          "./tsconfig.json",
+          "./packages/convex-helpers/tsconfig.json",
+          "./tsconfig.declarations.json",
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
     },

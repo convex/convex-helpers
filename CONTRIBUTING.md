@@ -37,6 +37,10 @@ npm run check
 For a frontend change, also run `npx vite build --config example-ui/vite.config.mts`.
 Use `npm pack` to inspect the package tarball.
 
+`npm run typecheck` also checks the built declarations with `skipLibCheck: false`
+under TypeScript 6 and 7. Run `npm run typecheck:declarations` for that check alone;
+its consumer fixtures in `type-tests/` import the package's published entrypoints.
+
 ### Working on Zod helpers
 
 When working on Zod compatibility, you can run tests for a single version with

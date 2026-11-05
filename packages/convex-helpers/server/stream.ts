@@ -711,10 +711,12 @@ export class StreamQueryInitializer<
   ): OrderedStreamQuery<Schema, T, "by_creation_time"> {
     return this.inner().order(order);
   }
-  reflect() {
+  reflect(): QueryReflection<Schema, T, "by_creation_time"> {
     return this.inner().reflect();
   }
-  iterWithKeys(trackBandwidth = false) {
+  iterWithKeys(
+    trackBandwidth = false,
+  ): StreamIterable<DocumentByName<DM<Schema>, T>> {
     return this.inner().iterWithKeys(trackBandwidth);
   }
   getOrder(): "asc" | "desc" {
@@ -726,7 +728,7 @@ export class StreamQueryInitializer<
   getIndexFields(): string[] {
     return this.inner().getIndexFields();
   }
-  narrow(indexBounds: IndexBounds) {
+  narrow(indexBounds: IndexBounds): QueryStream<DocumentByName<DM<Schema>, T>> {
     return this.inner().narrow(indexBounds);
   }
 }
@@ -761,10 +763,12 @@ export class StreamQuery<
   inner() {
     return this.order("asc");
   }
-  reflect() {
+  reflect(): QueryReflection<Schema, T, IndexName> {
     return this.inner().reflect();
   }
-  iterWithKeys(trackBandwidth = false) {
+  iterWithKeys(
+    trackBandwidth = false,
+  ): StreamIterable<DocumentByName<DM<Schema>, T>> {
     return this.inner().iterWithKeys(trackBandwidth);
   }
   getOrder(): "asc" | "desc" {
@@ -776,7 +780,7 @@ export class StreamQuery<
   getIndexFields(): string[] {
     return this.inner().getIndexFields();
   }
-  narrow(indexBounds: IndexBounds) {
+  narrow(indexBounds: IndexBounds): QueryStream<DocumentByName<DM<Schema>, T>> {
     return this.inner().narrow(indexBounds);
   }
 }
@@ -795,7 +799,7 @@ export class OrderedStreamQuery<
   ) {
     super();
   }
-  reflect() {
+  reflect(): QueryReflection<Schema, T, IndexName> {
     return {
       db: this.parent.parent.parent.db,
       schema: this.parent.parent.parent.schema,
@@ -853,7 +857,7 @@ export class OrderedStreamQuery<
   getIndexFields(): string[] {
     return this.parent.q.indexFields;
   }
-  narrow(indexBounds: IndexBounds) {
+  narrow(indexBounds: IndexBounds): QueryStream<DocumentByName<DM<Schema>, T>> {
     const { db, table, index, order, bounds, schema } = this.reflect();
     let maxLowerBound = bounds.lowerBound;
     let maxLowerBoundInclusive = bounds.lowerBoundInclusive;
