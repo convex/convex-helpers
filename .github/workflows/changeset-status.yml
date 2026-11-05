@@ -13,7 +13,11 @@ concurrency:
 
 jobs:
   status:
-    if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
+    if: >-
+      ${{
+        github.event.pull_request.user.type != 'Bot' &&
+        !startsWith(github.head_ref, 'changeset-release/')
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
