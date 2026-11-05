@@ -110,7 +110,7 @@ jobs:
           node --input-type=module <<'JS'
           import { readdirSync } from 'node:fs';
           const pending = readdirSync('.changeset').filter(file => file.endsWith('.md') && !/^(README|AGENTS|CLAUDE|GEMINI)\.md$/i.test(file) && !file.startsWith('.'));
-          if (pending.length) throw new Error(`Run npx changeset version to consume pending changesets: ${pending.join(', ')}`);
+          if (pending.length) throw new Error(`Run npm run version-packages to consume pending changesets: ${pending.join(', ')}`);
           JS
       - name: Build and check
         run: |

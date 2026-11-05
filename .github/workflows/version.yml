@@ -52,6 +52,7 @@ jobs:
         uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           github-token: ${{ github.token }}
+          script: npm run version-packages
           pr-title: "Prepare next release"
           commit-message: "Version packages"
           pr-base-branch: main

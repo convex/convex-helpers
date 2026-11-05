@@ -58,6 +58,32 @@ Add a release note with `npx changeset`: choose the version bump, describe the
 user-visible change, and commit the generated file with your implementation.
 Docs-only and development-tooling changes do not need a changeset.
 
+Edit the generated `.changeset/*.md` file to include relevant issue or PR links
+and optional contributor credits in the Markdown body. Use full links so they
+also work outside GitHub. For example:
+
+```md
+---
+"convex-helpers": patch
+---
+
+Fix cursor handling when resuming pagination
+([#1234](https://github.com/convex/convex-helpers/issues/1234)).
+Thanks to [@contributor](https://github.com/contributor) for the fix!
+```
+
+Keep the package/version frontmatter as generated; put links and credits in the
+body, without a leading bullet. Changesets preserves this Markdown in the
+changelog. Include `Fixes #1234` in the implementation PR's description to close
+the issue when that PR merges. Changelog links and credits are written by the
+author or reviewer, rather than inferred from commit authors or GitHub metadata.
+
+Release notes appear directly under the version heading, without a **Patch
+Changes** heading or automatic commit hashes. Minor and major headings remain to
+highlight larger changes. The release bot uses `npm run version-packages`, which
+runs Changesets and removes the patch heading from the new entry. Use this command
+for local versioning too; `npx changeset version` alone still adds that heading.
+
 Review and merge the release PR when ready. Click **Approve workflows to run**
 on the PR if its checks are waiting for approval. To refresh it manually, run the
 [Update release PR workflow](./.github/workflows/version.yml) on main.
@@ -79,14 +105,15 @@ To prepare a release locally instead of using the bot:
 npm ci
 npm run build
 npm run check
-npx changeset version
+npm run version-packages
 ```
 
 Review and commit the version, changelog, and consumed changesets. Land the commit
 through a PR, or push to main where repository rules permit.
 
 For an alpha, follow [Changesets' prerelease instructions](https://changesets.dev/guide/prereleases),
-commit and push the version changes, then run:
+using `npm run version-packages` for the version step. Commit and push the version
+changes, then run:
 
 ```sh
 gh workflow run release.yml --ref my-alpha-branch

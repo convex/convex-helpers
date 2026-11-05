@@ -151,12 +151,14 @@
     "build:bin": "esbuild packages/convex-helpers/cli/index.ts --bundle --platform=node --external:prettier --format=cjs --outfile=dist/bin.cjs",
     "clean": "rm -rf dist example-ui/dist",
     "pack": "npm pack",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:release",
+    "test:release": "node --test scripts/version-packages.test.mjs",
     "test:watch": "vitest",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
     "prepack": "npm run clean && npm run build",
-    "check": "npm run lint && npm test"
+    "check": "npm run lint && npm test",
+    "version-packages": "node scripts/version-packages.mjs"
   },
   "repository": {
     "type": "git",

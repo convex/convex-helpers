@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
-  "changelog": "@changesets/cli/changelog",
+  "changelog": "../scripts/changelog.mjs",
   "commit": false,
   "access": "public",
   "baseBranch": "main",
