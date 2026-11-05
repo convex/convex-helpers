@@ -94,15 +94,15 @@ To prepare a release locally instead of using the bot:
 npm ci
 npm run build
 npm run check
-GITHUB_TOKEN="$(gh auth token)" npx changeset version
+GITHUB_TOKEN="${GITHUB_TOKEN:-$(gh auth token)}" npx changeset version
 ```
 
 Review and commit the version, changelog, and consumed changesets. Land the commit
 through a PR, or push to main where repository rules permit.
 
 The GitHub generator needs `GITHUB_TOKEN` to look up PR metadata. The release bot
-receives it from GitHub Actions; locally, the command above uses your GitHub CLI
-login. You can also supply `GITHUB_TOKEN` through your environment.
+receives it from GitHub Actions; locally, the command above preserves an existing
+`GITHUB_TOKEN` and otherwise uses your GitHub CLI login.
 
 For an alpha, follow [Changesets' prerelease instructions](https://changesets.dev/guide/prereleases),
 providing `GITHUB_TOKEN` for the version step as above. Commit and push the version
