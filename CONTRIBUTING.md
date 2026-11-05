@@ -38,8 +38,8 @@ For a frontend change, also run `npx vite build --config example-ui/vite.config.
 Use `npm pack` to inspect the package tarball.
 
 `npm run typecheck` also checks the built declarations with `skipLibCheck: false`
-under TypeScript 6 and 7. Run `npm run typecheck:declarations` for that check alone;
-its consumer fixtures in `type-tests/` import the package's published entrypoints.
+under TypeScript 6 and 7. Its consumer fixtures in `type-tests/` import the
+package's published entrypoints.
 
 ### Working on Zod helpers
 
