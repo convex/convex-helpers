@@ -58,6 +58,21 @@ Add a release note with `npx changeset`: choose the version bump, describe the
 user-visible change, and commit the generated file with your implementation.
 Docs-only and development-tooling changes do not need a changeset.
 
+Edit the generated `.changeset/*.md` file to include relevant issue or PR links
+in the Markdown body. The GitHub changelog generator turns references such as
+`#1234` into links and adds the implementation PR link automatically. For example:
+
+```md
+---
+"convex-helpers": patch
+---
+
+Fix cursor handling when resuming pagination (#1234).
+```
+
+Write the summary in the body, without a leading bullet.
+Optional contributor credits can be written as Markdown links in the summary.
+
 Review and merge the release PR when ready. Click **Approve workflows to run**
 on the PR if its checks are waiting for approval. To refresh it manually, run the
 [Update release PR workflow](./.github/workflows/version.yml) on main.
@@ -79,14 +94,19 @@ To prepare a release locally instead of using the bot:
 npm ci
 npm run build
 npm run check
-npx changeset version
+GITHUB_TOKEN="${GITHUB_TOKEN:-$(gh auth token)}" npx changeset version
 ```
 
 Review and commit the version, changelog, and consumed changesets. Land the commit
 through a PR, or push to main where repository rules permit.
 
+The GitHub generator needs `GITHUB_TOKEN` to look up PR metadata. The release bot
+receives it from GitHub Actions; locally, the command above preserves an existing
+`GITHUB_TOKEN` and otherwise uses your GitHub CLI login.
+
 For an alpha, follow [Changesets' prerelease instructions](https://changesets.dev/guide/prereleases),
-commit and push the version changes, then run:
+providing `GITHUB_TOKEN` for the version step as above. Commit and push the version
+changes, then run:
 
 ```sh
 gh workflow run release.yml --ref my-alpha-branch

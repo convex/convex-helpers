@@ -1,6 +1,12 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
-  "changelog": "@changesets/cli/changelog",
+  "changelog": [
+    "@changesets/changelog-github",
+    {
+      "repo": "convex/convex-helpers",
+      "template": "\n\n- {summary} {pull}"
+    }
+  ],
   "commit": false,
   "access": "public",
   "baseBranch": "main",
