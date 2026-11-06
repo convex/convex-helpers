@@ -1681,7 +1681,7 @@ export class SingletonStream<
     const compareLowerBound = compareKeys(
       {
         value: indexBounds.lowerBound,
-        kind: indexBounds.lowerBoundInclusive ? "exact" : "successor",
+        kind: indexBounds.lowerBoundInclusive ? "predecessor" : "successor",
       },
       {
         value: this.#indexKey,
@@ -1695,7 +1695,7 @@ export class SingletonStream<
       },
       {
         value: indexBounds.upperBound,
-        kind: indexBounds.upperBoundInclusive ? "exact" : "predecessor",
+        kind: indexBounds.upperBoundInclusive ? "successor" : "predecessor",
       },
     );
     // If lowerBound <= this.indexKey <= upperBound, return this.value
@@ -1706,9 +1706,14 @@ export class SingletonStream<
         this.#indexFields,
         this.#indexKey,
         this.#equalityIndexFilter,
+        this.#bandwidth,
       );
     }
-    return new EmptyStream(this.#order, this.#indexFields);
+    return new EmptyStream(
+      this.#order,
+      this.#indexFields,
+      this.#equalityIndexFilter,
+    );
   }
 }
 
