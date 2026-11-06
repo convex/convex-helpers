@@ -14,14 +14,24 @@ import { mergedStream, stream, streamIndexRange } from "./stream.js";
 import { wrapDatabaseReader } from "./rowLevelSecurity.js";
 import { modules } from "./setup.test.js";
 
-// Reproduce/extend a run with CURSOR_TEST_SEED=123 CURSOR_TEST_CASES=100 npm test
-// -- packages/convex-helpers/server/stream.property.test.ts. Keep CI deterministic.
+// Local runs sample cursor mutations; CI runs the full deterministic matrix.
+// Use CURSOR_TEST_MODE=full for the same coverage locally, or tune a quick run
+// with CURSOR_TEST_SEED=123 CURSOR_TEST_CASES=100. See CONTRIBUTING.md.
 // These properties enforce query bounds, not confidentiality of indexed fields:
 // stream cursors intentionally contain index values, even for filtered-out rows.
+const mode =
+  process.env.CURSOR_TEST_MODE ?? (process.env.CI ? "full" : "quick");
+if (mode !== "quick" && mode !== "full") {
+  throw new Error("CURSOR_TEST_MODE must be quick or full");
+}
 const seeds = process.env.CURSOR_TEST_SEED
   ? [Number(process.env.CURSOR_TEST_SEED)]
-  : [1, 0xc0ffee, 0xdeadbeef];
-const cases = Number(process.env.CURSOR_TEST_CASES ?? 24);
+  : mode === "full"
+    ? [1, 0xc0ffee, 0xdeadbeef]
+    : [1];
+const cases = Number(
+  process.env.CURSOR_TEST_CASES ?? (mode === "full" ? 24 : 8),
+);
 if (
   !seeds.every(Number.isSafeInteger) ||
   !Number.isSafeInteger(cases) ||
@@ -334,8 +344,8 @@ async function check(
 }
 
 function mutations(keys: IndexKey[], rng: ReturnType<typeof random>): Cursor[] {
-  const result: IndexKey[] = [[], ...tenants.map((tenant) => [tenant])];
-  // Exhaust all prefix lengths and splice points for sampled real keys.
+  const result: IndexKey[] = [];
+  // Generate all prefix lengths and splice points, then sample in quick mode.
   for (const key of keys.slice(0, 6)) {
     for (let length = 0; length <= key.length; length++)
       result.push(key.slice(0, length));
@@ -351,7 +361,12 @@ function mutations(keys: IndexKey[], rng: ReturnType<typeof random>): Cursor[] {
   }
   return [
     ...new Map(
-      result.map((key) => {
+      [
+        // Always cover empty cursors and every tenant value type.
+        [],
+        ...tenants.map((tenant) => [tenant]),
+        ...(mode === "full" ? result : rng.shuffle(result).slice(0, cases)),
+      ].map((key) => {
         const c = cursor(key);
         return [c.wire, c];
       }),
