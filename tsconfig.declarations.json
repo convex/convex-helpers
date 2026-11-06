@@ -1,0 +1,8 @@
+{
+  "extends": "./packages/convex-helpers/tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false
+  },
+  "include": ["dist/**/*.d.ts", "type-tests/**/*.ts"],
+  "exclude": []
+}

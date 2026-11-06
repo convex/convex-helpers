@@ -11,6 +11,7 @@ import type {
   GenericSchema,
   TableNamesInDataModel,
   DataModelFromSchemaDefinition,
+  GenericDataModel,
 } from "convex/server";
 import {
   paginationOptsValidator,
@@ -26,6 +27,44 @@ import type {
 } from "convex/values";
 import { v } from "convex/values";
 import { doc, partial, systemFields } from "../validators.js";
+
+// Preserve the named data model in declarations instead of expanding its schema.
+type CrudFunctions<
+  DataModel extends GenericDataModel,
+  TableName extends TableNamesInDataModel<DataModel>,
+  QueryVisibility extends FunctionVisibility,
+  MutationVisibility extends FunctionVisibility,
+> = {
+  create: RegisteredMutation<
+    MutationVisibility,
+    WithoutSystemFields<DocumentByName<DataModel, TableName>>,
+    Promise<DocumentByName<DataModel, TableName>>
+  >;
+  read: RegisteredQuery<
+    QueryVisibility,
+    { id: GenericId<TableName> },
+    Promise<DocumentByName<DataModel, TableName> | null>
+  >;
+  paginate: RegisteredQuery<
+    QueryVisibility,
+    { paginationOpts: Infer<typeof paginationOptsValidator> },
+    Promise<PaginationResult<DocumentByName<DataModel, TableName>>>
+  >;
+  update: RegisteredMutation<
+    MutationVisibility,
+    {
+      id: GenericId<TableName>;
+      patch: Partial<WithoutSystemFields<DocumentByName<DataModel, TableName>>>;
+    },
+    Promise<void>
+  >;
+  destroy: RegisteredMutation<
+    MutationVisibility,
+    { id: GenericId<TableName> },
+    Promise<DocumentByName<DataModel, TableName> | null>
+  >;
+};
+
 /**
  * Create CRUD operations for a table.
  * You can expose these operations in your API. For example, in convex/users.ts:
@@ -71,8 +110,19 @@ export function crud<
     DataModelFromSchemaDefinition<SchemaDefinition<Schema, any>>,
     MutationVisibility
   > = internalMutationGeneric as any,
-) {
+): CrudFunctions<
+  DataModelFromSchemaDefinition<SchemaDefinition<Schema, any>>,
+  TableName,
+  QueryVisibility,
+  MutationVisibility
+> {
   type DataModel = DataModelFromSchemaDefinition<SchemaDefinition<Schema, any>>;
+  type Functions = CrudFunctions<
+    DataModel,
+    TableName,
+    QueryVisibility,
+    MutationVisibility
+  >;
   const validator = schema.tables[table]?.validator;
   if (!validator) {
     throw new Error(
@@ -109,21 +159,13 @@ export function crud<
         const id = await ctx.db.insert(table, args);
         return (await ctx.db.get(table, id))!;
       },
-    }) as RegisteredMutation<
-      MutationVisibility,
-      WithoutSystemFields<DocumentByName<DataModel, TableName>>,
-      Promise<DocumentByName<DataModel, TableName>>
-    >,
+    }) as Functions["create"],
     read: query({
       args: { id: v.id(table) },
       handler: async (ctx, args) => {
         return await ctx.db.get(table, args.id);
       },
-    }) as RegisteredQuery<
-      QueryVisibility,
-      { id: GenericId<TableName> },
-      Promise<DocumentByName<DataModel, TableName> | null>
-    >,
+    }) as Functions["read"],
     paginate: query({
       args: {
         paginationOpts: paginationOptsValidator,
@@ -131,11 +173,7 @@ export function crud<
       handler: async (ctx, args) => {
         return ctx.db.query(table).paginate(args.paginationOpts);
       },
-    }) as RegisteredQuery<
-      QueryVisibility,
-      { paginationOpts: Infer<typeof paginationOptsValidator> },
-      Promise<PaginationResult<DocumentByName<DataModel, TableName>>>
-    >,
+    }) as Functions["paginate"],
     update: mutation({
       args: {
         id: v.id(table),
@@ -152,16 +190,7 @@ export function crud<
           args.patch as Partial<DocumentByName<DataModel, TableName>>,
         );
       },
-    }) as RegisteredMutation<
-      MutationVisibility,
-      {
-        id: GenericId<TableName>;
-        patch: Partial<
-          WithoutSystemFields<DocumentByName<DataModel, TableName>>
-        >;
-      },
-      Promise<void>
-    >,
+    }) as Functions["update"],
     destroy: mutation({
       args: { id: v.id(table) },
       handler: async (ctx, args) => {
@@ -171,10 +200,6 @@ export function crud<
         }
         return old;
       },
-    }) as RegisteredMutation<
-      MutationVisibility,
-      { id: GenericId<TableName> },
-      Promise<null | DocumentByName<DataModel, TableName>>
-    >,
+    }) as Functions["destroy"],
   };
 }
