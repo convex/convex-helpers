@@ -977,33 +977,45 @@ export const latestMessages = query({
 
 ### Example 5: Append or prepend a row to each group.
 
-To emit `{ account, project: null }` after each account's projects, merge the
-projects with a `SingletonStream`. Inside the account's `flatMap` callback:
+To emit `{ account, project: null }` after each account's projects, use
+`flatMap` to merge each account's project stream with a `SingletonStream`:
 
 ```ts
-import { mergedStream, SingletonStream } from "convex-helpers/server/stream";
+import {
+  mergedStream,
+  SingletonStream,
+  stream,
+} from "convex-helpers/server/stream";
 import type { Doc } from "./_generated/dataModel";
+import schema from "./schema";
 
 type Row = { account: Doc<"accounts">; project: Doc<"projects"> | null };
 const fields = ["accountId", "_creationTime", "_id"];
-const projects = db
-  .query("projects")
-  .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
-  .map<Row>(async (project) => ({ account, project }));
+const db = stream(ctx.db, schema);
 
-const marker = new SingletonStream<Row>(
-  { account, project: null },
-  "asc",
-  fields,
-  [account._id, Infinity, ""], // Index key: after all projects in this account.
-  [account._id], // Fixed equality prefix.
-);
-return mergedStream([projects, marker], fields);
+const rows = db
+  .query("accounts")
+  .withIndex("by_userId", (q) => q.eq("userId", userId))
+  .flatMap(async (account) => {
+    const projects = db
+      .query("projects")
+      .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
+      .map<Row>(async (project) => ({ account, project }));
+
+    const marker = new SingletonStream<Row>(
+      { account, project: null },
+      "asc",
+      fields,
+      [account._id, Infinity, ""], // After all projects in this account.
+      [account._id], // Fixed equality prefix.
+    );
+    return mergedStream([projects, marker], fields);
+  }, fields);
+
+return await rows.paginate(paginationOpts);
 ```
 
-Here `db` is `stream(ctx.db, schema)`. Pass `fields` as the second argument to
-`accounts.flatMap`, then paginate the result. Accounts with no projects still
-emit the marker.
+Accounts with no projects still emit the marker.
 
 `Infinity` sorts after finite creation timestamps; use `-Infinity` to prepend.
 For descending streams, swap the signs and use `"desc"` throughout. This key
