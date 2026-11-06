@@ -32,6 +32,7 @@ Table of contents:
   - [Example 2: Paginate all messages whose authors match a complex predicate.](#example-2-paginate-all-messages-whose-authors-match-a-complex-predicate)
   - [Example 3: Order by a suffix of an index.](#example-3-order-by-a-suffix-of-an-index)
   - [Example 4: Join tables.](#example-4-join-tables)
+  - [Example 5: Append or prepend a row to each group.](#example-5-append-or-prepend-a-row-to-each-group)
 - [Query Caching](#query-caching)
 - [TypeScript API Generation](#typescript-api-generation)
 - [Open API Spec Generation](#open-api-spec-generation)
@@ -973,6 +974,54 @@ export const latestMessages = query({
   },
 });
 ```
+
+### Example 5: Append or prepend a row to each group.
+
+To emit `{ account, project: null }` after each account's projects, use
+`flatMap` to merge each account's project stream with a `SingletonStream`:
+
+```ts
+import {
+  mergedStream,
+  SingletonStream,
+  stream,
+} from "convex-helpers/server/stream";
+import type { Doc } from "./_generated/dataModel";
+import schema from "./schema";
+
+type Row = { account: Doc<"accounts">; project: Doc<"projects"> | null };
+const fields = ["accountId", "_creationTime", "_id"];
+const db = stream(ctx.db, schema);
+
+const rows = db
+  .query("accounts")
+  .withIndex("by_userId", (q) => q.eq("userId", userId))
+  .flatMap(async (account) => {
+    const projects = db
+      .query("projects")
+      .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
+      .map<Row>(async (project) => ({ account, project }));
+
+    const marker = new SingletonStream<Row>(
+      { account, project: null },
+      "asc",
+      fields,
+      [account._id, Infinity, ""], // After all projects in this account.
+      [account._id], // Fixed equality prefix.
+    );
+    return mergedStream([projects, marker], fields);
+  }, fields);
+
+return await rows.paginate(paginationOpts);
+```
+
+Accounts with no projects still emit the marker.
+
+`Infinity` sorts after finite creation timestamps; use `-Infinity` to prepend.
+For descending streams, swap the signs and use `"desc"` throughout. This key
+choice is specific to the index above. `.map()` preserves index keys regardless
+of the returned row's shape. Use an object for the marker: a bare `null` is
+filtered out. Markers count toward the page size.
 
 ## Query Caching
 
