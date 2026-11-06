@@ -32,6 +32,7 @@ Table of contents:
   - [Example 2: Paginate all messages whose authors match a complex predicate.](#example-2-paginate-all-messages-whose-authors-match-a-complex-predicate)
   - [Example 3: Order by a suffix of an index.](#example-3-order-by-a-suffix-of-an-index)
   - [Example 4: Join tables.](#example-4-join-tables)
+  - [Example 5: Append or prepend a row to each group.](#example-5-append-or-prepend-a-row-to-each-group)
 - [Query Caching](#query-caching)
 - [TypeScript API Generation](#typescript-api-generation)
 - [Open API Spec Generation](#open-api-spec-generation)
@@ -973,6 +974,76 @@ export const latestMessages = query({
   },
 });
 ```
+
+### Example 5: Append or prepend a row to each group.
+
+Suppose each account has zero or more projects. You want to paginate
+`{ account, project }` rows, followed by `{ account, project: null }` for every
+account, including accounts with no projects. Inside `flatMap`, merge the project
+stream with a `SingletonStream` containing the extra row:
+
+```ts
+import {
+  mergedStream,
+  SingletonStream,
+  stream,
+} from "convex-helpers/server/stream";
+import type { Doc } from "./_generated/dataModel";
+import schema from "./schema";
+
+// schema has:
+//   accounts: defineTable(...).index("by_userId", ["userId"])
+//   projects: defineTable(...).index("by_accountId", ["accountId"])
+type Row = { account: Doc<"accounts">; project: Doc<"projects"> | null };
+
+// Inside a query handler, with an authenticated userId and paginationOpts:
+const db = stream(ctx.db, schema);
+const projectFields = ["accountId", "_creationTime", "_id"];
+const accounts = db
+  .query("accounts")
+  .withIndex("by_userId", (q) => q.eq("userId", userId));
+
+const rows = accounts.flatMap(async (account) => {
+  const projects = db
+    .query("projects")
+    .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
+    .map<Row>(async (project) => ({ account, project }));
+
+  const endOfAccount = new SingletonStream<Row>(
+    { account, project: null }, // The emitted value.
+    "asc", // Same order as the accounts and projects streams.
+    projectFields, // Full index fields, including the implicit tie-breakers.
+    [account._id, Infinity, ""], // A key after all projects in this account.
+    [account._id], // Values fixed by equality filters on the index prefix.
+  );
+  return mergedStream([projects, endOfAccount], projectFields);
+}, projectFields);
+
+return await rows.paginate(paginationOpts);
+```
+
+`mergedStream` sorts by index keys; the order of its input streams does not
+determine which rows come first. Here, all projects have the same `accountId`
+and finite `_creationTime` values, so `Infinity` places the extra row last.
+The final `""` fills the `_id` slot; it never breaks a tie with a real project
+because their creation times differ from the marker's. To prepend the row, use
+`-Infinity` instead. For descending streams, set both queries and the singleton
+to `"desc"`, and swap the signs: `-Infinity` appends, `Infinity` prepends.
+For other indexes, choose a key that sorts before or after all matching rows;
+this timestamp recipe is not a universal sentinel for arbitrary index values.
+
+The row's shape is independent of its index key. `.map()` preserves the original
+keys even if you nest, rename, or remove indexed fields from the emitted value.
+The singleton's `indexKey` must have one value per `indexFields` entry, and its
+`equalityIndexFilter` contains fixed **values**, not field names. The fields
+passed to `flatMap` describe the inner merged stream.
+
+Use an object such as `{ account, project: null }` for the marker. A bare
+`SingletonStream(null, ...)` represents a filtered-out item, so it emits no row
+and a subsequent `.map()` will not turn it into one. Markers count toward the
+page size and can appear on a different page from their account's projects.
+As with other reactive stream queries, use
+[`usePaginatedQuery` from `convex-helpers/react`](#composable-querystreams).
 
 ## Query Caching
 
