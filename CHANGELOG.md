@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.135
+
+### Patch Changes
+
+- Fix `SingletonStream` pagination with open or prefix bounds, and preserve bandwidth accounting and equality filters when narrowing a stream ([#1011](https://github.com/convex/convex-helpers/issues/1011)). [#1069](https://github.com/convex/convex-helpers/pull/1069)
+
 ## 0.1.134
 
 ### Patch Changes
