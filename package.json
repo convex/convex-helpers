@@ -240,7 +240,7 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.9.0",
     "hono": "4.3.6",
-    "jsdom": "30.0.1",
+    "jsdom": "31.0.0",
     "npm-run-all2": "9.0.3",
     "pkg-pr-new": "0.0.86",
     "prettier": "3.9.6",
