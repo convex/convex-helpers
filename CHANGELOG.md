@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.136
+
+### Patch Changes
+
+- Fix the published TypeScript declarations for `server/crud` and `server/stream` [#1067](https://github.com/convex/convex-helpers/pull/1067)
+  so they typecheck without `skipLibCheck`. Preserve schema, document, index, and
+  function visibility types without generating references to undeclared type names.
+
 ## 0.1.135
 
 ### Patch Changes
