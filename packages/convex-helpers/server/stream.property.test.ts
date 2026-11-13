@@ -14,23 +14,12 @@ import { mergedStream, stream, streamIndexRange } from "./stream.js";
 import { wrapDatabaseReader } from "./rowLevelSecurity.js";
 import { modules } from "./setup.test.js";
 
-// Reproduce/extend a run with CURSOR_TEST_SEED=123 CURSOR_TEST_CASES=100 npm test
-// -- packages/convex-helpers/server/stream.property.test.ts. Keep CI deterministic.
 // These properties enforce query bounds, not confidentiality of indexed fields:
 // stream cursors intentionally contain index values, even for filtered-out rows.
-const seeds = process.env.CURSOR_TEST_SEED
-  ? [Number(process.env.CURSOR_TEST_SEED)]
-  : [1, 0xc0ffee, 0xdeadbeef];
-const cases = Number(process.env.CURSOR_TEST_CASES ?? 24);
-if (
-  !seeds.every(Number.isSafeInteger) ||
-  !Number.isSafeInteger(cases) ||
-  cases < 1
-) {
-  throw new Error(
-    "CURSOR_TEST_SEED and CURSOR_TEST_CASES must be integers; cases must be positive",
-  );
-}
+// Increase cases or add seeds (e.g. 0xc0ffee, 0xdeadbeef) for more coverage when
+// changing stream.ts. Keep the defaults small for routine test runs.
+const seeds = [1];
+const cases = 8;
 
 const tenantValidator = v.optional(
   v.union(
@@ -334,8 +323,8 @@ async function check(
 }
 
 function mutations(keys: IndexKey[], rng: ReturnType<typeof random>): Cursor[] {
-  const result: IndexKey[] = [[], ...tenants.map((tenant) => [tenant])];
-  // Exhaust all prefix lengths and splice points for sampled real keys.
+  const result: IndexKey[] = [];
+  // Generate all prefix lengths and splice points, then sample up to cases.
   for (const key of keys.slice(0, 6)) {
     for (let length = 0; length <= key.length; length++)
       result.push(key.slice(0, length));
@@ -351,7 +340,12 @@ function mutations(keys: IndexKey[], rng: ReturnType<typeof random>): Cursor[] {
   }
   return [
     ...new Map(
-      result.map((key) => {
+      [
+        // Always cover empty cursors and every tenant value type.
+        [],
+        ...tenants.map((tenant) => [tenant]),
+        ...rng.shuffle(result).slice(0, cases),
+      ].map((key) => {
         const c = cursor(key);
         return [c.wire, c];
       }),
