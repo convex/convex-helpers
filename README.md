@@ -1080,6 +1080,11 @@ This provider takes three optional props:
 - **debug** (boolean) -- Dump console logs every 3s to debug the state of
   the cache (Default: false).
 
+When the provider unmounts, or its client or options change, it closes every
+subscription it holds right away, idle ones included. Rendering it with a `key`
+(for example the signed-in user or the selected organization) drops everything
+cached for the previous key without waiting for `expiration`.
+
 Finally, you can utilize `useQuery` (and `useQueries`) just the same as
 their `convex/react` equivalents.
 
