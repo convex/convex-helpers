@@ -6,9 +6,9 @@ on:
   # Started on a tag by the version workflow, or by hand to retry a tag.
   workflow_dispatch:
 
+# One group per tag: versions never cancel each other, and reruns of a tag wait.
 concurrency:
-  group: ${{ github.workflow }}
-  queue: max
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 permissions: {}

@@ -1,8 +1,8 @@
 name: Update release PR
 
+# One group per commit, so no run is cancelled; each tags its own commit's version.
 concurrency:
-  group: ${{ github.workflow }}
-  queue: max
+  group: ${{ github.workflow }}-${{ github.sha }}
   cancel-in-progress: false
 
 on:
