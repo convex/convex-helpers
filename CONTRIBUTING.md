@@ -81,14 +81,25 @@ Review and merge the release PR when ready. Click **Approve workflows to run**
 on the PR if its checks are waiting for approval. To refresh it manually, run the
 [Update release PR workflow](./.github/workflows/version.yml) on main.
 
-After staging, review the package under **Settings → Staged Packages** on
+When the release PR merges, CI tags the commit that set the new version as
+`v<version>` and starts the [Release workflow](./.github/workflows/release.yml)
+on that tag. To release a different commit, tag it yourself:
+
+```sh
+gh api repos/convex/convex-helpers/git/refs -f ref=refs/tags/v1.2.3 -f sha=<commit>
+```
+
+Or, from a local clone: `git tag v1.2.3 <commit> && git push origin v1.2.3`.
+
+The tag must match `package.json`'s version. Stable releases must be on `main`;
+the commit may be older than the current tip. GitHub runs the release workflow
+from the tagged commit, so the commit must include it. The workflow builds and
+checks that commit, then stages the tested package on npm.
+
+Review the package under **Settings → Staged Packages** on
 [npm](https://www.npmjs.com) and approve with 2FA, or use
 `npm stage approve <stage-id>` with the ID from the workflow log. Approve versions
 in order to avoid moving `latest` backward.
-
-See [version.yml](./.github/workflows/version.yml) for PR automation and
-[release.yml](./.github/workflows/release.yml) for release selection, checks,
-staging, and tagging.
 
 ### Local preparation and alphas
 
@@ -110,20 +121,27 @@ receives it from GitHub Actions; locally, the command above preserves an existin
 
 For an alpha, follow [Changesets' prerelease instructions](https://changesets.dev/guide/prereleases),
 providing `GITHUB_TOKEN` for the version step as above. Commit and push the version
-changes, then run:
-
-```sh
-gh workflow run release.yml --ref my-alpha-branch
-```
-
-To retry an earlier version-bump commit on the selected ref, add
-`-f commit=<full-sha>`.
+changes on your branch, then tag that commit, such as `v1.2.3-alpha.0`. The first
+prerelease identifier selects the npm channel, such as `alpha`.
 
 ### Recovery
 
-| Situation                                                                                      | Action                                                                                                                                                                                               |
-| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Transient failure before uploading to npm                                                      | Re-run **failed jobs** for the same release commit.                                                                                                                                                  |
-| Staging succeeded, but tagging failed                                                          | Re-run **failed jobs** to retry tagging. Re-running all jobs would attempt to upload the same version again and may fail before reaching tagging.                                                    |
-| The upload failed, but npm may have received it                                                | Check npm's staged packages and published versions. If absent, retry the failed jobs. If present, verify its source commit and create any missing Git tag on that commit instead of uploading again. |
-| Fixing the failure requires changing the release commit, such as consuming leftover changesets | Merge the fix with a new version bump, even if the failed version was never published. Keep the original release commit intact; retrying it would repeat the same failure.                           |
+The tag records intent to release; npm is the source of truth for what was
+staged. If the workflow fails, check npm's staged packages first:
+
+- Tagged, but Release didn't start: start it on the tag with
+  `gh workflow run release.yml -R convex/convex-helpers --ref v1.2.3`.
+- Not staged: rerun the failed jobs
+  (`gh run rerun <run-id> -R convex/convex-helpers --failed`), for example after
+  pushing `main` if the tag went first. A rerun uses the run's original commit
+  and works for 30 days.
+
+  To release a different commit, fix the source and move the tag:
+
+  ```sh
+  gh api -X PATCH repos/convex/convex-helpers/git/refs/tags/v1.2.3 -f sha=<commit> -F force=true
+  ```
+
+- Staged, but rejected in review: `npm stage reject <stage-id>` frees the
+  version, so you can move the tag to a corrected commit. A published version
+  cannot be reused; prepare a new version instead.
