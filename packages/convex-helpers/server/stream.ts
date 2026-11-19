@@ -96,10 +96,10 @@ function splitRange(
   ) => {
     const range = commonPrefix.slice();
     let i = 0;
-    for (; i < key.length - 1; i++) {
+    for (; i < key.length - 1 && i < indexFields.length; i++) {
       range.push(["eq", indexFields[i]!, key[i]!]);
     }
-    if (i < key.length) {
+    if (i < key.length && i < indexFields.length) {
       range.push([boundType, indexFields[i]!, key[i]!]);
     }
     return range;
@@ -125,12 +125,15 @@ function splitRange(
     middleRange = makeCompare(startBoundType, startBound);
   } else if (startBound.length === 0) {
     middleRange = makeCompare(endBoundType, endBound);
-  } else {
+  } else if (indexFields.length > 0) {
     const startValue = startBound[0]!;
     const endValue = endBound[0]!;
     middleRange = commonPrefix.slice();
     middleRange.push([startBoundType, indexFields[0]!, startValue]);
     middleRange.push([endBoundType, indexFields[0]!, endValue]);
+  } else {
+    // All fields are in the common prefix, use it as the middle range
+    middleRange = commonPrefix.slice();
   }
   const ranges = [...startRanges, middleRange, ...endRanges];
   if (order === "desc") {

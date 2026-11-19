@@ -1439,6 +1439,47 @@ describe("stream", () => {
       ]);
     });
   });
+
+  test("pagination with eq(undefined) on compound index", async () => {
+    // Regression test for bug where eq(field, undefined) on a compound index
+    // would cause "Cannot use gte on field 'undefined'" error during pagination
+    const testSchema = defineSchema({
+      items: defineTable({
+        softDeletedAt: v.optional(v.number()),
+        updatedAt: v.number(),
+      }).index("by_active_updated", ["softDeletedAt", "updatedAt"]),
+    });
+    const t = convexTest(testSchema, modules);
+    await t.run(async (ctx) => {
+      // Insert some active (non-deleted) items
+      await ctx.db.insert("items", { updatedAt: 1 });
+      await ctx.db.insert("items", { updatedAt: 2 });
+      await ctx.db.insert("items", { updatedAt: 3 });
+      // Insert some soft-deleted items
+      await ctx.db.insert("items", { softDeletedAt: 100, updatedAt: 4 });
+
+      const query = stream(ctx.db, testSchema)
+        .query("items")
+        .withIndex("by_active_updated", (q) => q.eq("softDeletedAt", undefined))
+        .order("desc");
+
+      // This should not throw "Cannot use gte on field 'undefined'"
+      const result = await query.paginate({ numItems: 2, cursor: null });
+      expect(result.page.length).toBe(2);
+      expect(result.page[0]!.updatedAt).toBe(3);
+      expect(result.page[1]!.updatedAt).toBe(2);
+      expect(result.isDone).toBe(false);
+
+      // Continue pagination
+      const page2 = await query.paginate({
+        numItems: 2,
+        cursor: result.continueCursor,
+      });
+      expect(page2.page.length).toBe(1);
+      expect(page2.page[0]!.updatedAt).toBe(1);
+      expect(page2.isDone).toBe(true);
+    });
+  });
 });
 
 describe("bandwidth tracking", () => {
