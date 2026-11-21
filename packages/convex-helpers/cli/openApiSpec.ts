@@ -80,6 +80,8 @@ function generateSchemaFromValidator(
       return "type: boolean";
     case "string":
       return "type: string";
+    case "function":
+      return "type: string\npattern: ^function://";
     case "bytes":
       return side === "args"
         ? [

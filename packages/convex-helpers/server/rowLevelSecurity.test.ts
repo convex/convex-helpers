@@ -42,7 +42,6 @@ const withRLS = async (ctx: { db: DatabaseWriter; auth: Auth }) => {
   const tokenIdentifier = (await ctx.auth.getUserIdentity())?.tokenIdentifier;
   if (!tokenIdentifier) throw new Error("Unauthenticated");
   return {
-    ...ctx,
     db: wrapDatabaseWriter({ tokenIdentifier }, ctx.db, {
       notes: {
         read: async ({ tokenIdentifier }, doc) => {

@@ -2,6 +2,7 @@ import { CommitTsPlaceholder, ConvexError, v } from "convex/values";
 import type {
   GenericId,
   GenericValidator,
+  Infer,
   ObjectType,
   OptionalProperty,
   PropertyValidators,
@@ -13,6 +14,7 @@ import type {
   VBytes,
   VCommitTs,
   VFloat64,
+  VFunction,
   VId,
   VInt64,
   VLiteral,
@@ -43,6 +45,7 @@ import type { Customization, Registration } from "./customFunctions.js";
 import { NoOp } from "./customFunctions.js";
 import {
   addFieldsToValidator,
+  validate,
   vRequired,
   type VRequired,
 } from "../validators.js";
@@ -618,6 +621,11 @@ export function zodOutputToConvexFields<Fields extends ZodFields>(
  *
  * This function returns Zod validators, not Zod Mini validators.
  *
+ * Function handles are checked as strings with the `function://` prefix,
+ * matching the SDK. Convex validates the embedded ID; function signatures
+ * are only checked by TypeScript. Converting this custom Zod schema back with
+ * `zodToConvex` or `zodOutputToConvex` yields `v.any()`, not `v.function()`.
+ *
  * @param convexValidator Convex validator can be any validator from "convex/values" e.g. `v.string()`
  * @returns Zod validator (e.g. `z.string()`) with inferred type matching the Convex validator
  */
@@ -634,6 +642,11 @@ export function convexToZod<V extends GenericValidator>(
       convexValidator satisfies VId<any>;
       zodValidator = zid(convexValidator.tableName);
       break;
+    case "function": {
+      const required = vRequired(convexValidator);
+      zodValidator = z.custom<Infer<V>>((value) => validate(required, value));
+      break;
+    }
     case "string":
       zodValidator = z.string();
       break;
@@ -1991,7 +2004,9 @@ export type ZodFromValidatorBase<V extends GenericValidator> =
                                       >
                                   : V extends VAny<any, OptionalProperty, any>
                                     ? z.ZodAny
-                                    : never;
+                                    : V extends VFunction<infer Type>
+                                      ? z.ZodCustom<Type, Type>
+                                      : never;
 
 type BrandIfBranded<InnerType, Validator extends zCore.SomeType> =
   InnerType extends zCore.$brand<infer Brand>

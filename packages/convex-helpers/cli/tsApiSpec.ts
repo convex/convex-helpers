@@ -74,6 +74,14 @@ function generateArgsType(argsJson: ValidatorJSON): string {
       return "boolean";
     case "string":
       return "string";
+    case "function": {
+      const fnType = argsJson.fnType ? JSON.stringify(argsJson.fnType) : "any";
+      const args = argsJson.args ? generateArgsType(argsJson.args) : "any";
+      const returns = argsJson.returns
+        ? generateArgsType(argsJson.returns)
+        : "any";
+      return `import("convex/server").FunctionHandle_future<${fnType}, ${args}, ${returns}>`;
+    }
     case "bytes":
       return "ArrayBuffer";
     case "any":

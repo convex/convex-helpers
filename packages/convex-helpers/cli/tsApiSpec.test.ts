@@ -30,3 +30,45 @@ test("generatedCodeIsValid", () => {
   // the generated code is invalid.
   eval(jsCode);
 });
+
+test("function handles retain signatures in generated types", () => {
+  const spec = JSON.parse(
+    JSON.stringify({
+      url: "https://test-convex-url.convex.cloud",
+      functions: [
+        {
+          functionType: "Mutation",
+          identifier: "example.js:run",
+          visibility: { kind: "public" },
+          args: {
+            type: "object",
+            value: {
+              callback: {
+                optional: true,
+                fieldType: {
+                  type: "function",
+                  fnType: "mutation",
+                  args: {
+                    type: "object",
+                    value: {
+                      count: { optional: false, fieldType: { type: "number" } },
+                    },
+                  },
+                  returns: { type: "string" },
+                },
+              },
+            },
+          },
+          returns: { type: "array", value: { type: "function" } },
+        },
+      ],
+    }),
+  );
+  const code = generateApiSpec(spec, false);
+  expect(code).toContain(
+    'callback?: import("convex/server").FunctionHandle_future<"mutation", { count: number, }, string>',
+  );
+  expect(code).toContain(
+    'Array<import("convex/server").FunctionHandle_future<any, any, any>>',
+  );
+});

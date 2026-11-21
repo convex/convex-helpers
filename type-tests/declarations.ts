@@ -1,4 +1,7 @@
 // Compile against the published entrypoints, never the package's source files.
+import { convexToZod as convexToZod3 } from "convex-helpers/server/zod3";
+import { convexToZod as convexToZod4 } from "convex-helpers/server/zod4";
+import { parse, vRequired } from "convex-helpers/validators";
 import { crud } from "convex-helpers/server/crud";
 import { stream } from "convex-helpers/server/stream";
 import type { QueryReflection } from "convex-helpers/server/stream";
@@ -13,6 +16,8 @@ import type {
   DataModelFromSchemaDefinition,
   DocumentByName,
   FunctionArgs,
+  FunctionHandle_future,
+  FunctionReturnType,
   GenericDatabaseReader,
   MutationBuilder,
   PaginationResult,
@@ -117,4 +122,30 @@ export function checkLooseSchema(
   expectType<QueryReflection<typeof looseSchema, "users", "by_name">>(
     stream(db, looseSchema).query("users").withIndex("by_name").reflect(),
   );
+}
+
+export function checkFunctionHandles(value: unknown) {
+  const signature = v.function({
+    fnType: "mutation",
+    args: { count: v.number() },
+    returns: v.string(),
+  });
+  type Handle = FunctionHandle_future<"mutation", { count: number }, string>;
+  const required = vRequired(v.optional(signature));
+  expectType<Handle>(required.type);
+  const handle3 = convexToZod3(required).parse(value);
+  const handle4 = convexToZod4(required).parse(value);
+  expectType<Handle>(handle3);
+  expectType<Handle>(handle4);
+  expectType<Handle>(parse(required, value));
+  // @ts-expect-error Conversion must retain the argument type, not widen to any.
+  expectType<string>((null! as FunctionArgs<typeof handle3>).count);
+  // @ts-expect-error Conversion must retain the return type, not widen to any.
+  expectType<number>(null! as FunctionReturnType<typeof handle4>);
+  // @ts-expect-error Removing optionality must exclude undefined.
+  expectType<typeof required.type>(undefined);
+
+  const optional = v.optional(signature);
+  expectType<Handle | undefined>(convexToZod3(optional).parse(value));
+  expectType<Handle | undefined>(convexToZod4(optional).parse(value));
 }

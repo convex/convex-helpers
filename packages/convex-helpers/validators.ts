@@ -20,6 +20,7 @@ import type {
   VBytes,
   VCommitTs,
   VFloat64,
+  VFunction,
   VId,
   VInt64,
   VLiteral,
@@ -594,6 +595,9 @@ export class ValidationError extends Error {
  * It only validates that the ID is a string. Function `args`, `returns` and
  * schema definitions will validate that the ID is an ID for the given table.
  *
+ * Function handles are checked for the `function://` prefix. Convex validates
+ * their embedded ID; the signature is only checked by TypeScript.
+ *
  * @param validator The validator to validate against.
  * @param value The value to validate.
  * @returns Whether the value is valid against the validator.
@@ -615,7 +619,8 @@ export function validate<T extends Validator<any, any, any>>(
   },
 ): value is T["type"] {
   let valid = true;
-  let expected: string = validator.kind;
+  let expected: string =
+    validator.kind === "function" ? "function handle" : validator.kind;
   let got: string | undefined;
   if (value === undefined) {
     if (validator.isOptional !== "optional") {
@@ -653,6 +658,11 @@ export function validate<T extends Validator<any, any, any>>(
         if (typeof value !== "string") {
           valid = false;
         }
+        break;
+      }
+      case "function": {
+        // Match the SDK's handle recognition; Convex validates the embedded ID.
+        valid = typeof value === "string" && value.startsWith("function://");
         break;
       }
       case "bytes": {
@@ -1001,7 +1011,12 @@ export type VRequired<T extends Validator<any, OptionalProperty, any>> =
                                   "required",
                                   FieldPaths
                                 >
-                              : never;
+                              : T extends VFunction<
+                                    infer Type,
+                                    OptionalProperty
+                                  >
+                                ? VFunction<NotUndefined<Type>, "required">
+                                : never;
 
 /**
  * Converts an optional validator to a required validator.
@@ -1059,6 +1074,12 @@ export function vRequired<T extends Validator<any, OptionalProperty, any>>(
       return v.union(...validator.members) as VRequired<T>;
     case "commitTs":
       return v.commitTs() as VRequired<T>;
+    case "function":
+      return v.function({
+        fnType: validator.fnType,
+        args: validator.args,
+        returns: validator.returns,
+      }) as VRequired<T>;
     default:
       kind satisfies never;
       throw new Error("Unknown Convex validator type: " + kind);

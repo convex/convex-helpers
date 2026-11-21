@@ -12,6 +12,7 @@ import type {
   VId,
   VUnion,
   VFloat64,
+  VFunction,
   VInt64,
   VCommitTs,
   VBoolean,
@@ -50,7 +51,7 @@ import {
   NoOp,
 } from "./customFunctions.js";
 import { pick } from "../index.js";
-import { addFieldsToValidator } from "../validators.js";
+import { addFieldsToValidator, validate, vRequired } from "../validators.js";
 
 export type ZodValidator = Record<string, z.ZodTypeAny>;
 
@@ -1668,7 +1669,9 @@ type ZodFromValidatorBase<V extends GenericValidator> =
                                 },
                               ]
                             >
-                          : z.ZodTypeAny; // fallback for unknown validators
+                          : V extends VFunction<infer Type, any>
+                            ? z.ZodType<Exclude<Type, undefined>>
+                            : z.ZodTypeAny; // fallback for unknown validators
 
 /**
  * Better type conversion from a Convex validator to a Zod validator
@@ -1695,6 +1698,11 @@ export type ZodValidatorFromConvex<V extends GenericValidator> =
  * convexToZod(v.string()) // → z.string()
  * ```
  *
+ * Function handles are checked as strings with the `function://` prefix,
+ * matching the SDK. Convex validates the embedded ID; function signatures
+ * are only checked by TypeScript. Converting this custom Zod schema back with
+ * `zodToConvex` or `zodOutputToConvex` yields `v.any()`, not `v.function()`.
+ *
  * @param convexValidator Convex validator can be any validator from "convex/values" e.g. `v.string()`
  * @returns Zod validator (e.g. `z.string()`) with inferred type matching the Convex validator
  */
@@ -1710,6 +1718,11 @@ export function convexToZod<V extends GenericValidator>(
     case "id":
       zodValidator = zid((convexValidator as VId<any>).tableName);
       break;
+    case "function": {
+      const required = vRequired(convexValidator);
+      zodValidator = z.custom<Infer<V>>((value) => validate(required, value));
+      break;
+    }
     case "string":
       zodValidator = z.string();
       break;

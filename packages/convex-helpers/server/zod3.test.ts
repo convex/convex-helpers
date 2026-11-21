@@ -1298,3 +1298,59 @@ test("convexToZod object with union of one literal", () => {
   expect(zodUnion.parse({ member: "hello" })).toEqual({ member: "hello" });
   expect(() => zodUnion.parse({ member: "world" })).toThrow();
 });
+
+describe("convexToZod function handles", () => {
+  const handle = "function://test-handle#tasks:run";
+  const signature = v.function({
+    fnType: "mutation",
+    args: { count: v.number() },
+    returns: v.string(),
+  });
+
+  test("preserves the handle signature", () => {
+    const schema = convexToZod(signature);
+    expectTypeOf<z.input<typeof schema>>().toEqualTypeOf<
+      Infer<typeof signature>
+    >();
+    expectTypeOf<z.output<typeof schema>>().toEqualTypeOf<
+      Infer<typeof signature>
+    >();
+    expect(schema.parse(handle)).toBe(handle);
+    expect(convexToZod(v.function()).parse(handle)).toBe(handle);
+  });
+
+  test.each([undefined, null, 42, {}, () => {}, "tasks:run", ""])(
+    "rejects values that are not handle strings: %s",
+    (value) => {
+      expect(convexToZod(signature).safeParse(value).success).toBe(false);
+    },
+  );
+
+  test("preserves optionality and nested signatures", () => {
+    const validator = v.object({
+      callback: v.optional(signature),
+      callbacks: v.array(signature),
+      result: v.union(v.null(), signature),
+    });
+    const schema = convexToZod(validator);
+    expectTypeOf<z.input<typeof schema>>().toEqualTypeOf<
+      Infer<typeof validator>
+    >();
+    expectTypeOf<z.output<typeof schema>>().toEqualTypeOf<
+      Infer<typeof validator>
+    >();
+    const value = { callbacks: [handle], result: null };
+    expect(schema.parse(value)).toEqual(value);
+    expect(
+      schema.parse({ ...value, callback: handle, result: handle }),
+    ).toEqual({
+      ...value,
+      callback: handle,
+      result: handle,
+    });
+    expect(schema.safeParse({ ...value, callbacks: ["invalid"] }).success).toBe(
+      false,
+    );
+    expect(schema.safeParse({ ...value, callback: 42 }).success).toBe(false);
+  });
+});
