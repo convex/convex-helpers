@@ -1,5 +1,5 @@
 ---
-"convex-helpers": patch
+"convex-helpers": minor
 ---
 
 Support the `v.function()` validator introduced in Convex 1.49 in `convexToZod`
