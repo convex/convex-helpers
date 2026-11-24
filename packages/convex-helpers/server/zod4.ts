@@ -336,7 +336,7 @@ export const zid = <
  */
 export const zCommitTs = (): ZCommitTs => {
   const result = z.union([z.bigint(), z.instanceof(CommitTsPlaceholder)]);
-  _convexValidatorRegistry.add(result, { convexValidator: v.commitTs() });
+  _zCommitTsRegistry.add(result, { commitTs: true });
   return result;
 };
 
@@ -1688,10 +1688,8 @@ function zodToConvexCommon<Z extends zCore.$ZodType>(
   if (validator instanceof zCore.$ZodUnion) {
     // zCommitTs() is a union containing a z.instanceof(), which would become
     // v.any() if converted member by member.
-    const registered = _convexValidatorRegistry.get(validator);
-    if (registered !== undefined) {
-      // Zod rewrites the registry metadata type, which loses the validator type
-      return registered.convexValidator as GenericValidator;
+    if (_zCommitTsRegistry.get(validator) !== undefined) {
+      return v.commitTs();
     }
     return v.union(...validator._zod.def.options.map(toConvex));
   }
@@ -2077,13 +2075,10 @@ type ZodShapeFromConvexObject<Fields extends Record<string, GenericValidator>> =
 const _zidRegistry = zCore.registry<{ tableName: string }>();
 
 /**
- * Stores the Convex validator to convert a Zod schema to, for helpers like
- * {@link zCommitTs} whose schema would lose precision if converted from its
- * structure.
+ * Stores each schema created by {@link zCommitTs}. The metadata can't be empty:
+ * clones (e.g. from `.describe()`) only inherit non-empty metadata.
  */
-const _convexValidatorRegistry = zCore.registry<{
-  convexValidator: GenericValidator;
-}>();
+const _zCommitTsRegistry = zCore.registry<{ commitTs: true }>();
 
 // #endregion
 
