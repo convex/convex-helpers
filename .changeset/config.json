@@ -4,7 +4,7 @@
     "@changesets/changelog-github",
     {
       "repo": "convex/convex-helpers",
-      "template": "\n\n- {pull} {summary}"
+      "template": "\n\n- {summary}"
     }
   ],
   "commit": false,
