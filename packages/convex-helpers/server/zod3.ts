@@ -50,7 +50,7 @@ import {
   NoOp,
 } from "./customFunctions.js";
 import { pick } from "../index.js";
-import { addFieldsToValidator } from "../validators.js";
+import { addFieldsToValidator, type VRequired } from "../validators.js";
 
 export type ZodValidator = Record<string, z.ZodTypeAny>;
 
@@ -644,6 +644,13 @@ type ConvexUnionValidatorFromZodOutput<T> = T extends z.ZodTypeAny[]
  * ```
  */
 export type ConvexValidatorFromZod<Z extends z.ZodTypeAny> =
+  Z extends ConvexValidatorMarker<
+    infer V extends Validator<any, "required", any>
+  >
+    ? V
+    : ConvexValidatorFromUnmarkedZod<Z>;
+
+type ConvexValidatorFromUnmarkedZod<Z extends z.ZodTypeAny> =
   // Keep this in sync with zodToConvex implementation
   // and the ConvexValidatorFromZodOutput type
   Z extends Zid<infer TableName>
@@ -942,6 +949,10 @@ export type ConvexValidatorFromZod<Z extends z.ZodTypeAny> =
 export function zodToConvex<Z extends z.ZodTypeAny>(
   zod: Z,
 ): ConvexValidatorFromZod<Z> {
+  const marked = zod._def[convexValidatorKey];
+  if (marked !== undefined) {
+    return marked as ConvexValidatorFromZod<Z>;
+  }
   const typeName: ZodFirstPartyTypeKind | "ConvexId" = zod._def.typeName;
   switch (typeName) {
     case "ConvexId":
@@ -1072,6 +1083,13 @@ export function zodToConvex<Z extends z.ZodTypeAny>(
  * {@link zodToConvex}/{@link zodOutputToConvex}.
  */
 export type ConvexValidatorFromZodOutput<Z extends z.ZodTypeAny> =
+  Z extends ConvexValidatorMarker<
+    infer V extends Validator<any, "required", any>
+  >
+    ? V
+    : ConvexValidatorFromUnmarkedZodOutput<Z>;
+
+type ConvexValidatorFromUnmarkedZodOutput<Z extends z.ZodTypeAny> =
   // Keep this in sync with the zodOutputToConvex implementation
   // IMPORTANT: The differences are at the bottom
   Z extends Zid<infer TableName>
@@ -1333,6 +1351,10 @@ export type ConvexValidatorFromZodOutput<Z extends z.ZodTypeAny> =
 export function zodOutputToConvex<Z extends z.ZodTypeAny>(
   zod: Z,
 ): ConvexValidatorFromZodOutput<Z> {
+  const marked = zod._def[convexValidatorKey];
+  if (marked !== undefined) {
+    return marked as ConvexValidatorFromZodOutput<Z>;
+  }
   const typeName: ZodFirstPartyTypeKind | "ConvexId" = zod._def.typeName;
   switch (typeName) {
     // These are the special cases that differ from the input validator
@@ -1509,6 +1531,33 @@ export function zodOutputToConvexFields<Z extends ZodValidator>(zod: Z) {
   ) as { [k in keyof Z]: ConvexValidatorFromZodOutput<Z[k]> };
 }
 
+/**
+ * Key in a Zod schema's `_def` for the Convex validator that zodToConvex and
+ * zodOutputToConvex return for a schema created by convexToZod, when
+ * converting the Zod schema itself would lose precision (e.g. `v.commitTs()`,
+ * whose Zod schema contains a `z.instanceof()`). Zod copies `_def` when it
+ * clones a schema (e.g. `.describe()`), so the marker is kept.
+ */
+const convexValidatorKey = Symbol("convexValidator");
+
+declare const convexValidatorMarker: unique symbol;
+
+/**
+ * Marks the type of a schema created by convexToZod with the Convex validator
+ * it converts back to (see `convexValidatorKey`).
+ */
+type ConvexValidatorMarker<V extends Validator<any, "required", any>> = {
+  readonly [convexValidatorMarker]: V;
+};
+
+function withConvexValidator<Z extends z.ZodTypeAny>(
+  zod: Z,
+  convexValidator: Validator<any, "required", any>,
+): Z {
+  zod._def[convexValidatorKey] = convexValidator;
+  return zod;
+}
+
 interface ZidDef<TableName extends string> extends ZodTypeDef {
   typeName: "ConvexId";
   tableName: TableName;
@@ -1619,7 +1668,8 @@ type ZodFromValidatorBase<V extends GenericValidator> =
         : V extends VInt64<any, any>
           ? z.ZodBigInt
           : V extends VCommitTs<any, any>
-            ? z.ZodUnion<[z.ZodBigInt, z.ZodType<CommitTsPlaceholder>]>
+            ? z.ZodUnion<[z.ZodBigInt, z.ZodType<CommitTsPlaceholder>]> &
+                ConvexValidatorMarker<VRequired<V>>
             : V extends VBoolean<any, any>
               ? z.ZodBoolean
               : V extends VNull<any, any>
@@ -1720,7 +1770,10 @@ export function convexToZod<V extends GenericValidator>(
       zodValidator = z.bigint();
       break;
     case "commitTs":
-      zodValidator = z.union([z.bigint(), z.instanceof(CommitTsPlaceholder)]);
+      zodValidator = withConvexValidator(
+        z.union([z.bigint(), z.instanceof(CommitTsPlaceholder)]),
+        v.commitTs(),
+      );
       break;
     case "boolean":
       zodValidator = z.boolean();
