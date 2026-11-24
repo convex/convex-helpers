@@ -406,7 +406,7 @@ Example:
 
 ```js
 import * as z from "zod";
-import { zCustomQuery, zid } from "convex-helpers/server/zod4";
+import { zCustomQuery, zid, zCommitTs } from "convex-helpers/server/zod4";
 import { NoOp } from "convex-helpers/server/customFunctions";
 
 // Define this once - and customize like you would customQuery
@@ -415,6 +415,7 @@ const zodQuery = zCustomQuery(query, NoOp);
 export const myComplexQuery = zodQuery({
   args: {
     userId: zid("users"),
+    since: zCommitTs(),
     email: z.email(),
     num: z.number().min(0),
     nullableBigint: z.nullable(z.bigint()),
