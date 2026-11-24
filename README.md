@@ -440,6 +440,11 @@ export const myComplexQuery = zodQuery({
 });
 ```
 
+Use `zid("tableName")` for document IDs and `zCommitTs()` for commit timestamps
+(`v.commitTs()`). Zod has no equivalent for these, so when the Zod schema is
+converted to a Convex validator (for function arguments, return values, or
+`zodToConvex`), these helpers become `v.id("tableName")` and `v.commitTs()`.
+
 ## Hono for advanced HTTP endpoint definitions
 
 [Hono](https://hono.dev/) is an optimized web framework you can use to define

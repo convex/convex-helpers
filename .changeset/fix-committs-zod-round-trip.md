@@ -2,4 +2,4 @@
 "convex-helpers": patch
 ---
 
-Convert `v.commitTs()` back to `v.commitTs()` after a round trip through `convexToZod` and `zodToConvex` or `zodOutputToConvex`, instead of a union that accepts any value.
+Add `zCommitTs()`, the Zod equivalent of `v.commitTs()`, which `zodToConvex` and `zodOutputToConvex` convert back to `v.commitTs()`. `convexToZod(v.commitTs())` now returns it, so a commitTs field no longer becomes a union that accepts any value after a round trip.

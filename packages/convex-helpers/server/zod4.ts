@@ -323,6 +323,32 @@ export const zid = <
   return result;
 };
 
+/**
+ * Creates a validator for a Convex commit timestamp, the Zod equivalent of
+ * `v.commitTs()`.
+ *
+ * It accepts a `bigint`, or the `CommitTsPlaceholder` that `db.vars.commitTs`
+ * leaves in a document when you read it back in the mutation that wrote it.
+ * When converted to a Convex validator (e.g. through {@link zodToConvex}), it
+ * becomes `v.commitTs()`.
+ *
+ * @returns A Zod schema representing a Convex commit timestamp
+ */
+export const zCommitTs = (): ZCommitTs => {
+  const result = z.union([z.bigint(), z.instanceof(CommitTsPlaceholder)]);
+  _convexValidatorRegistry.add(result, { convexValidator: v.commitTs() });
+  return result;
+};
+
+/** The type of {@link zCommitTs} validators */
+export type ZCommitTs = z.ZodUnion<
+  readonly [
+    z.ZodBigInt,
+    // `ZodCustom` before Zod 4.6, `ZodInstanceOf` since then
+    ReturnType<typeof z.instanceof<typeof CommitTsPlaceholder>>,
+  ]
+>;
+
 /** The type of Convex validators in Zod */
 export type Zid<TableName extends string> = z.ZodCustom<
   GenericId<TableName>,
@@ -644,10 +670,7 @@ export function convexToZod<V extends GenericValidator>(
       zodValidator = z.bigint();
       break;
     case "commitTs":
-      zodValidator = z.union([z.bigint(), z.instanceof(CommitTsPlaceholder)]);
-      _convexValidatorRegistry.add(zodValidator, {
-        convexValidator: v.commitTs(),
-      });
+      zodValidator = zCommitTs();
       break;
     case "boolean":
       zodValidator = z.boolean();
@@ -1084,19 +1107,6 @@ type ConvexValidatorFromZodCommon<
   IsOptional extends "required" | "optional",
   Side extends "input" | "output",
 > =
-  Z extends ConvexValidatorMarker<
-    infer V extends Validator<any, "required", any>
-  >
-    ? IsOptional extends "optional"
-      ? VOptional<V>
-      : V
-    : ConvexValidatorFromZodUnmarked<Z, IsOptional, Side>;
-
-type ConvexValidatorFromZodUnmarked<
-  Z extends zCore.$ZodType,
-  IsOptional extends "required" | "optional",
-  Side extends "input" | "output",
-> =
   // Basic types
   Z extends Zid<infer TableName>
     ? VId<GenericId<TableName>>
@@ -1185,7 +1195,9 @@ type ConvexValidatorFromZodUnmarked<
                             Z extends zCore.$ZodUnion<
                                 infer T extends readonly zCore.$ZodType[]
                               >
-                            ? ConvexUnionValidatorFromZod<T, Side>
+                            ? Z extends ZCommitTs
+                              ? VCommitTs
+                              : ConvexUnionValidatorFromZod<T, Side>
                             : // z.tuple()
                               Z extends zCore.$ZodTuple<
                                   infer Inner extends readonly zCore.$ZodType[],
@@ -1624,12 +1636,6 @@ function zodToConvexCommon<Z extends zCore.$ZodType>(
   validator: Z,
   toConvex: (x: zCore.$ZodType) => GenericValidator,
 ): GenericValidator {
-  const marked = _convexValidatorRegistry.get(validator);
-  if (marked !== undefined) {
-    // Zod rewrites the registry metadata type, which loses the validator type
-    return marked.convexValidator as GenericValidator;
-  }
-
   if (validator instanceof zCore.$ZodString) {
     return v.string();
   }
@@ -1680,6 +1686,13 @@ function zodToConvexCommon<Z extends zCore.$ZodType>(
   }
 
   if (validator instanceof zCore.$ZodUnion) {
+    // zCommitTs() is a union containing a z.instanceof(), which would become
+    // v.any() if converted member by member.
+    const registered = _convexValidatorRegistry.get(validator);
+    if (registered !== undefined) {
+      // Zod rewrites the registry metadata type, which loses the validator type
+      return registered.convexValidator as GenericValidator;
+    }
     return v.union(...validator._zod.def.options.map(toConvex));
   }
 
@@ -1902,14 +1915,7 @@ export type ZodFromValidatorBase<V extends GenericValidator> =
         : V extends VInt64<any>
           ? z.ZodBigInt
           : V extends VCommitTs<any>
-            ? z.ZodUnion<
-                readonly [
-                  z.ZodBigInt,
-                  // `ZodCustom` before Zod 4.6, `ZodInstanceOf` since then
-                  ReturnType<typeof z.instanceof<typeof CommitTsPlaceholder>>,
-                ]
-              > &
-                ConvexValidatorMarker<VRequired<V>>
+            ? ZCommitTs
             : V extends VBoolean<any>
               ? z.ZodBoolean
               : V extends VNull<any>
@@ -2071,24 +2077,13 @@ type ZodShapeFromConvexObject<Fields extends Record<string, GenericValidator>> =
 const _zidRegistry = zCore.registry<{ tableName: string }>();
 
 /**
- * Stores the Convex validator that zodToConvex and zodOutputToConvex return
- * for a schema created by convexToZod, when converting the Zod schema itself
- * would lose precision (e.g. `v.commitTs()`, whose Zod schema contains a
- * `z.instanceof()`).
+ * Stores the Convex validator to convert a Zod schema to, for helpers like
+ * {@link zCommitTs} whose schema would lose precision if converted from its
+ * structure.
  */
 const _convexValidatorRegistry = zCore.registry<{
   convexValidator: GenericValidator;
 }>();
-
-declare const convexValidatorMarker: unique symbol;
-
-/**
- * Marks the type of a schema created by convexToZod with the Convex validator
- * it converts back to (see `_convexValidatorRegistry`).
- */
-type ConvexValidatorMarker<V extends Validator<any, "required", any>> = {
-  readonly [convexValidatorMarker]: V;
-};
 
 // #endregion
 
