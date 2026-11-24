@@ -1022,9 +1022,8 @@ test("convexToZod basic types", () => {
 });
 
 test("convexToZod commitTs", () => {
-  const _expected = z.union([z.bigint(), z.instanceof(CommitTsPlaceholder)]);
   const validator = convexToZod(v.commitTs());
-  expectTypeOf(validator).toEqualTypeOf<typeof _expected>();
+  expectTypeOf(validator).toEqualTypeOf<ZCommitTs>();
   expect(validator.safeParse(1n).success).toBe(true);
   expect(validator.safeParse(new CommitTsPlaceholder()).success).toBe(true);
 });
@@ -1084,8 +1083,10 @@ describe("zCommitTs", () => {
     );
   });
 
-  test("unions with z.any() are not commitTs", () => {
-    const validator = zodToConvex(z.union([z.bigint(), z.any()]));
+  test("hand-written unions are not commitTs", () => {
+    const validator = zodToConvex(
+      z.union([z.bigint(), z.instanceof(CommitTsPlaceholder)]),
+    );
     expectTypeOf(validator).not.toEqualTypeOf<VCommitTs>();
     expect(validator.kind).toBe("union");
   });
