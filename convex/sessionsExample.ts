@@ -44,7 +44,7 @@ import { v } from "convex/values";
 export const queryWithSession = customQuery(query, {
   args: SessionIdArg,
   input: async (ctx, { sessionId }) => {
-    return { ctx: { ...ctx, sessionId }, args: {} };
+    return { ctx: { sessionId }, args: {} };
   },
 });
 
@@ -67,7 +67,7 @@ export const queryWithSession = customQuery(query, {
 export const mutationWithSession = customMutation(mutation, {
   args: SessionIdArg,
   input: async (ctx, { sessionId }) => {
-    return { ctx: { ...ctx, sessionId }, args: {} };
+    return { ctx: { sessionId }, args: {} };
   },
 });
 
@@ -99,7 +99,6 @@ export const actionWithSession = customAction(action, {
       runSessionFunctions(ctx, sessionId);
     return {
       ctx: {
-        ...ctx,
         runSessionQuery,
         runSessionMutation,
         runSessionAction,

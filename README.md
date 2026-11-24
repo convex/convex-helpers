@@ -276,7 +276,7 @@ export const queryWithSession = customQuery(query, {
   args: SessionIdArg,
   input: async (ctx, { sessionId }) => {
     const anonymousUser = await getAnonUser(ctx, sessionId);
-    return { ctx: { ...ctx, anonymousUser }, args: {} };
+    return { ctx: { anonymousUser }, args: {} };
   },
 });
 ```
