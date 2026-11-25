@@ -144,3 +144,49 @@ test("bytes fields generate the wire shape for each side", async () => {
   expect(apiSpec).toMatch(/value:\n\s+type: string\n\s+format: byte\n/);
   expect(apiSpec.match(/\$bytes/g)).toHaveLength(2);
 });
+
+test("function handles use strings in argument and return schemas", () => {
+  const spec = JSON.parse(
+    JSON.stringify({
+      url: "https://test-convex-url.convex.cloud",
+      functions: [
+        {
+          functionType: "Mutation",
+          identifier: "example.js:run",
+          visibility: { kind: "public" },
+          args: {
+            type: "object",
+            value: {
+              callback: {
+                optional: true,
+                fieldType: {
+                  type: "function",
+                  fnType: "mutation",
+                  args: {
+                    type: "object",
+                    value: {
+                      count: { optional: false, fieldType: { type: "number" } },
+                    },
+                  },
+                  returns: { type: "string" },
+                },
+              },
+            },
+          },
+          returns: { type: "array", value: { type: "function" } },
+        },
+      ],
+    }),
+  );
+  const schemas = parse(generateOpenApiSpec(spec, false)).components.schemas;
+  const args = schemas["Request_example.run"].properties.args;
+  expect(args.properties.callback).toEqual({
+    type: "string",
+    pattern: "^function://",
+  });
+  expect(args.required ?? []).not.toContain("callback");
+  expect(schemas["Response_example.run"].properties.value).toEqual({
+    type: "array",
+    items: { type: "string", pattern: "^function://" },
+  });
+});

@@ -203,6 +203,20 @@ describe("vRequired", () => {
     testVRequired(v.optional(v.int64()), v.int64());
   });
 
+  test("preserves function signature and metadata", () => {
+    const signature = v.function({
+      fnType: "mutation",
+      args: { count: v.number() },
+      returns: v.string(),
+    });
+    testVRequired(v.optional(signature), signature);
+    testVRequired(v.optional(v.function()), v.function());
+    expect(vRequired(signature)).toBe(signature);
+    const required = vRequired(v.optional(signature));
+    expect(required.args).toBe(signature.args);
+    expect(required.returns).toBe(signature.returns);
+  });
+
   test("converts optional commitTs to required", () => {
     testVRequired(v.optional(v.commitTs()), v.commitTs());
   });
@@ -302,5 +316,43 @@ describe("record validators only accept plain objects", () => {
     const nullProto = Object.create(null);
     nullProto.a = "x";
     expect(validate(record, nullProto)).toBe(true);
+  });
+});
+
+describe("function handle validation", () => {
+  const validator = v.function({ fnType: "query", returns: v.number() });
+  const handle = "function://test-handle#tasks:run";
+
+  test("accepts handles and parses nested optional handles", () => {
+    expect(validate(validator, handle)).toBe(true);
+    expect(parse(validator, handle)).toBe(handle);
+    expectTypeOf(parse(validator, handle)).toEqualTypeOf<
+      typeof validator.type
+    >();
+    const nested = v.object({ callback: v.optional(validator) });
+    expect(parse(nested, {})).toEqual({});
+    expect(parse(nested, { callback: handle })).toEqual({ callback: handle });
+  });
+
+  test.each([undefined, null, 42, {}, () => {}, "tasks:run", ""])(
+    "rejects values that are not handle strings: %s",
+    (value) => {
+      expect(validate(validator, value)).toBe(false);
+      expect(() => validate(validator, value, { throw: true })).toThrow(
+        "Expected `function handle`",
+      );
+      expect(() => parse(validator, value)).toThrow(
+        "Expected `function handle`",
+      );
+    },
+  );
+
+  test("reports the path of an invalid nested handle", () => {
+    expect(() =>
+      parse(v.object({ callback: validator }), { callback: "invalid" }),
+    ).toThrow("callback");
+    expect(validate(v.optional(validator), undefined)).toBe(true);
+    expect(validate(v.union(v.null(), validator), null)).toBe(true);
+    expect(validate(v.union(v.null(), validator), "invalid")).toBe(false);
   });
 });
