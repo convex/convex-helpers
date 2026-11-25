@@ -74,6 +74,19 @@ export const zid = <
 ) => new Zid({ typeName: "ConvexId", tableName });
 
 /**
+ * Creates a validator for a Convex commit timestamp, the Zod equivalent of
+ * `v.commitTs()`.
+ *
+ * It accepts a `bigint`, or the `CommitTsPlaceholder` that `db.vars.commitTs`
+ * leaves in a document when you read it back in the mutation that wrote it.
+ * When converted to a Convex validator (e.g. through {@link zodToConvex}), it
+ * becomes `v.commitTs()`.
+ *
+ * @returns A Zod schema representing a Convex commit timestamp
+ */
+export const zCommitTs = () => new ZCommitTs({ typeName: "ConvexCommitTs" });
+
+/**
  * Useful to get the input context type for a custom function using Zod.
  */
 export type ZCustomCtx<Builder> =
@@ -863,7 +876,9 @@ export type ConvexValidatorFromZod<Z extends z.ZodTypeAny> =
                                                       // : Validator<any, "required", string>
                                                       // We avoid doing this catch-all to avoid over-promising on types
                                                       // : Z extends z.ZodTypeAny
-                                                      never;
+                                                      Z extends ZCommitTs
+                                                      ? VCommitTs
+                                                      : never;
 
 /**
  * Turns a Zod validator into a Convex Validator.
@@ -943,10 +958,13 @@ export type ConvexValidatorFromZod<Z extends z.ZodTypeAny> =
 export function zodToConvex<Z extends z.ZodTypeAny>(
   zod: Z,
 ): ConvexValidatorFromZod<Z> {
-  const typeName: ZodFirstPartyTypeKind | "ConvexId" = zod._def.typeName;
+  const typeName: ZodFirstPartyTypeKind | "ConvexId" | "ConvexCommitTs" =
+    zod._def.typeName;
   switch (typeName) {
     case "ConvexId":
       return v.id(zod._def.tableName) as ConvexValidatorFromZod<Z>;
+    case "ConvexCommitTs":
+      return v.commitTs() as ConvexValidatorFromZod<Z>;
     case "ZodString":
       return v.string() as ConvexValidatorFromZod<Z>;
     case "ZodNumber":
@@ -1271,7 +1289,9 @@ export type ConvexValidatorFromZodOutput<Z extends z.ZodTypeAny> =
                                                         infer Out
                                                       >
                                                     ? ConvexValidatorFromZodOutput<Out>
-                                                    : never;
+                                                    : Z extends ZCommitTs
+                                                      ? VCommitTs
+                                                      : never;
 
 /**
  * Converts a Zod validator to a Convex validator that checks the value _after_
@@ -1334,7 +1354,8 @@ export type ConvexValidatorFromZodOutput<Z extends z.ZodTypeAny> =
 export function zodOutputToConvex<Z extends z.ZodTypeAny>(
   zod: Z,
 ): ConvexValidatorFromZodOutput<Z> {
-  const typeName: ZodFirstPartyTypeKind | "ConvexId" = zod._def.typeName;
+  const typeName: ZodFirstPartyTypeKind | "ConvexId" | "ConvexCommitTs" =
+    zod._def.typeName;
   switch (typeName) {
     // These are the special cases that differ from the input validator
     case "ZodDefault":
@@ -1351,6 +1372,8 @@ export function zodOutputToConvex<Z extends z.ZodTypeAny>(
     // These are the same as input
     case "ConvexId":
       return v.id(zod._def.tableName) as ConvexValidatorFromZodOutput<Z>;
+    case "ConvexCommitTs":
+      return v.commitTs() as ConvexValidatorFromZodOutput<Z>;
     case "ZodString":
       return v.string() as ConvexValidatorFromZodOutput<Z>;
     case "ZodNumber":
@@ -1527,6 +1550,24 @@ export class Zid<TableName extends string> extends z.ZodType<
   }
 }
 
+interface ZCommitTsDef extends ZodTypeDef {
+  typeName: "ConvexCommitTs";
+}
+
+const commitTsSchema = z.union([z.bigint(), z.instanceof(CommitTsPlaceholder)]);
+
+/**
+ * A Zod validator for a Convex commit timestamp (see {@link zCommitTs}).
+ */
+export class ZCommitTs extends z.ZodType<
+  bigint | CommitTsPlaceholder,
+  ZCommitTsDef
+> {
+  _parse(input: z.ParseInput) {
+    return commitTsSchema._parse(input);
+  }
+}
+
 /**
  * Zod helper for adding Convex system fields to a record to return.
  *
@@ -1620,7 +1661,7 @@ type ZodFromValidatorBase<V extends GenericValidator> =
         : V extends VInt64<any, any>
           ? z.ZodBigInt
           : V extends VCommitTs<any, any>
-            ? z.ZodUnion<[z.ZodBigInt, z.ZodType<CommitTsPlaceholder>]>
+            ? ZCommitTs
             : V extends VBoolean<any, any>
               ? z.ZodBoolean
               : V extends VNull<any, any>
@@ -1733,7 +1774,7 @@ export function convexToZod<V extends GenericValidator>(
       zodValidator = z.bigint();
       break;
     case "commitTs":
-      zodValidator = z.union([z.bigint(), z.instanceof(CommitTsPlaceholder)]);
+      zodValidator = zCommitTs();
       break;
     case "boolean":
       zodValidator = z.boolean();

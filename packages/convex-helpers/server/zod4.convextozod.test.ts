@@ -7,10 +7,20 @@ import {
   GenericValidator,
   Infer,
   v,
+  VCommitTs,
   VFloat64,
   VString,
 } from "convex/values";
-import { convexToZod, Zid, zid, ZodValidatorFromConvex } from "./zod4";
+import {
+  convexToZod,
+  ZCommitTs,
+  zCommitTs,
+  Zid,
+  zid,
+  zodOutputToConvex,
+  zodToConvex,
+  ZodValidatorFromConvex,
+} from "./zod4";
 import { literals } from "../validators";
 import { isSameType } from "zod-compare";
 
@@ -248,6 +258,62 @@ describe("convexToZod", () => {
           z.literal(Role.Admin),
         ]),
       ),
+    );
+  });
+});
+
+describe("zCommitTs", () => {
+  const json = (validator: GenericValidator) => (validator as any).json;
+  const ts = v.commitTs();
+  const object = v.object({ ts, optionalTs: v.optional(ts) });
+  type OptionalCommitTs = VCommitTs<
+    bigint | CommitTsPlaceholder | undefined,
+    "optional"
+  >;
+
+  test("convexToZod returns zCommitTs()", () => {
+    expectTypeOf(convexToZod(ts)).toEqualTypeOf<ZCommitTs>();
+    expectTypeOf(zCommitTs()).toEqualTypeOf<ZCommitTs>();
+    expect(zCommitTs().safeParse(1n).success).toBe(true);
+    expect(zCommitTs().safeParse(new CommitTsPlaceholder()).success).toBe(true);
+    expect(zCommitTs().safeParse(1).success).toBe(false);
+  });
+
+  test("zodToConvex", () => {
+    const required = zodToConvex(zCommitTs());
+    expectTypeOf(required).toEqualTypeOf<VCommitTs>();
+    expect(json(required)).toEqual(json(ts));
+
+    const optional = zodToConvex(zCommitTs().optional());
+    expectTypeOf(optional).toEqualTypeOf<OptionalCommitTs>();
+    expect(json(optional)).toEqual(json(ts));
+    expect(optional.isOptional).toBe("optional");
+
+    const nested = zodToConvex(convexToZod(object));
+    expectTypeOf(nested.fields.ts).toEqualTypeOf<VCommitTs>();
+    expectTypeOf(nested.fields.optionalTs).toEqualTypeOf<OptionalCommitTs>();
+    expect(json(nested)).toEqual(json(object));
+
+    expect(json(zodToConvex(zCommitTs().describe("ts")))).toEqual(json(ts));
+  });
+
+  test("zodOutputToConvex", () => {
+    const required = zodOutputToConvex(zCommitTs());
+    expectTypeOf(required).toEqualTypeOf<VCommitTs>();
+    expect(json(required)).toEqual(json(ts));
+
+    const optional = zodOutputToConvex(zCommitTs().optional());
+    expectTypeOf(optional).toEqualTypeOf<OptionalCommitTs>();
+    expect(json(optional)).toEqual(json(ts));
+    expect(optional.isOptional).toBe("optional");
+
+    const nested = zodOutputToConvex(convexToZod(object));
+    expectTypeOf(nested.fields.ts).toEqualTypeOf<VCommitTs>();
+    expectTypeOf(nested.fields.optionalTs).toEqualTypeOf<OptionalCommitTs>();
+    expect(json(nested)).toEqual(json(object));
+
+    expect(json(zodOutputToConvex(zCommitTs().describe("ts")))).toEqual(
+      json(ts),
     );
   });
 });

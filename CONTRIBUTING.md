@@ -62,16 +62,17 @@ Add a release note with `npx changeset`: choose the version bump, describe the
 user-visible change, and commit the generated file with your implementation.
 Docs-only and development-tooling changes do not need a changeset.
 
-Edit the generated `.changeset/*.md` file to include relevant issue or PR links
-in the Markdown body. The GitHub changelog generator turns references such as
-`#1234` into links and adds the implementation PR link automatically. For example:
+Once your PR is open, add its number in parentheses at the end of the first
+paragraph of each changeset, for example `(#279)`.
+The GitHub changelog generator links these references and any relevant issue
+references you include in the changeset. For example:
 
 ```md
 ---
 "convex-helpers": patch
 ---
 
-Fix cursor handling when resuming pagination (#1234).
+Fix cursor handling when resuming pagination. (#1234)
 ```
 
 Write the summary in the body, without a leading bullet.
