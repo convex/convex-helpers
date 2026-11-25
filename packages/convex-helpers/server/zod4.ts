@@ -2,7 +2,6 @@ import { CommitTsPlaceholder, ConvexError, v } from "convex/values";
 import type {
   GenericId,
   GenericValidator,
-  Infer,
   ObjectType,
   OptionalProperty,
   PropertyValidators,
@@ -31,6 +30,8 @@ import type {
   ActionBuilder,
   ArgsArrayToObject,
   DefaultFunctionArgs,
+  FunctionHandle_future,
+  FunctionType,
   FunctionVisibility,
   GenericActionCtx,
   GenericDataModel,
@@ -343,6 +344,38 @@ export const zCommitTs = (): ZCommitTs => {
   return result;
 };
 
+/**
+ * Creates a validator for a Convex function handle, the Zod equivalent of
+ * `v.function()`. It takes the same optional signature.
+ *
+ * - When **used within Zod**, it checks that the value is a string starting
+ *   with `function://`. The signature is only checked by TypeScript.
+ * - When **converted to a Convex validator** (e.g. through {@link zodToConvex}),
+ *   it becomes the equivalent `v.function()`, with its signature.
+ *
+ * @returns A Zod schema representing a Convex function handle
+ */
+export const zFunction = <
+  Type extends FunctionType | undefined = undefined,
+  Args extends GenericValidator | PropertyValidators | undefined = undefined,
+  Returns extends GenericValidator | PropertyValidators | undefined = undefined,
+>(signature?: {
+  fnType?: Type;
+  args?: Args;
+  returns?: Returns;
+}) => zFunctionFromValidator(v.function(signature));
+
+function zFunctionFromValidator<Type>(
+  validator: VFunction<Type, "required">,
+): ZFunction<Type> {
+  const result = z.custom<Type>((value) => validate(validator, value));
+  _zFunctionRegistry.add(result, { validator });
+  return result;
+}
+
+/** The type of {@link zFunction} validators */
+export type ZFunction<Type> = z.ZodCustom<Type, Type>;
+
 /** The type of {@link zCommitTs} validators */
 export type ZCommitTs = z.ZodUnion<
   readonly [
@@ -647,11 +680,6 @@ export function zodOutputToConvexFields<Fields extends ZodFields>(
  *
  * This function returns Zod validators, not Zod Mini validators.
  *
- * Function handles are checked as strings with the `function://` prefix,
- * matching the SDK. Convex validates the embedded ID; function signatures
- * are only checked by TypeScript. Converting this custom Zod schema back with
- * `zodToConvex` or `zodOutputToConvex` yields `v.any()`, not `v.function()`.
- *
  * @param convexValidator Convex validator can be any validator from "convex/values" e.g. `v.string()`
  * @returns Zod validator (e.g. `z.string()`) with inferred type matching the Convex validator
  */
@@ -668,11 +696,11 @@ export function convexToZod<V extends GenericValidator>(
       convexValidator satisfies VId<any>;
       zodValidator = zid(convexValidator.tableName);
       break;
-    case "function": {
-      const required = vRequired(convexValidator);
-      zodValidator = z.custom<Infer<V>>((value) => validate(required, value));
+    case "function":
+      zodValidator = zFunctionFromValidator(
+        vRequired(convexValidator as VFunction<any, OptionalProperty>),
+      );
       break;
-    }
     case "string":
       zodValidator = z.string();
       break;
@@ -1408,7 +1436,12 @@ type ConvexValidatorFromZodCommon<
                                                     ? VAny<any, "required"> // No runtime info about types so we use v.any()
                                                     : // z.custom()
                                                       Z extends zCore.$ZodCustom<any>
-                                                      ? VAny<any, "required">
+                                                      ? Z extends ZFunction<
+                                                          infer Type extends
+                                                            FunctionHandle_future<any>
+                                                        >
+                                                        ? VFunction<Type>
+                                                        : VAny<any, "required">
                                                       : // z.intersection()
                                                         // We could do some more advanced logic here where we compute
                                                         // the Convex validator that results from the intersection.
@@ -1820,6 +1853,10 @@ function zodToConvexCommon<Z extends zCore.$ZodType>(
     ) {
       return v.id(idTableName.tableName);
     }
+    const fn = _zFunctionRegistry.get(validator);
+    if (fn !== undefined) {
+      return fn.validator as VFunction<any, "required">;
+    }
     return v.any();
   }
 
@@ -2032,7 +2069,7 @@ export type ZodFromValidatorBase<V extends GenericValidator> =
                                   : V extends VAny<any, OptionalProperty, any>
                                     ? z.ZodAny
                                     : V extends VFunction<infer Type>
-                                      ? z.ZodCustom<Type, Type>
+                                      ? ZFunction<Type>
                                       : never;
 
 type BrandIfBranded<InnerType, Validator extends zCore.SomeType> =
@@ -2094,6 +2131,13 @@ const _zidRegistry = zCore.registry<{ tableName: string }>();
  * clones (e.g. from `.describe()`) only inherit non-empty metadata.
  */
 const _zCommitTsRegistry = zCore.registry<{ commitTs: true }>();
+
+/**
+ * Stores the `v.function()` validator for each {@link zFunction} schema. It's
+ * typed `unknown` because registries remap metadata types, which breaks
+ * `VFunction`.
+ */
+const _zFunctionRegistry = zCore.registry<{ validator: unknown }>();
 
 // #endregion
 

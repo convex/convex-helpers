@@ -9,12 +9,15 @@ import {
   v,
   VCommitTs,
   VFloat64,
+  VFunction,
   VString,
 } from "convex/values";
 import {
   convexToZod,
   ZCommitTs,
   zCommitTs,
+  ZFunction,
+  zFunction,
   Zid,
   zid,
   zodOutputToConvex,
@@ -467,5 +470,69 @@ describe("convexToZod function handles", () => {
       false,
     );
     expect(schema.safeParse({ ...value, callback: 42 }).success).toBe(false);
+  });
+});
+
+describe("zFunction", () => {
+  const json = (validator: GenericValidator) => (validator as any).json;
+  const handle = "function://test-handle#tasks:run";
+  const signature = v.function({
+    fnType: "mutation",
+    args: { count: v.number() },
+    returns: v.string(),
+  });
+  type Handle = Infer<typeof signature>;
+  const object = v.object({
+    callback: signature,
+    optionalCallback: v.optional(signature),
+  });
+
+  test("convexToZod returns a zFunction()", () => {
+    const schema = zFunction({
+      fnType: "mutation",
+      args: { count: v.number() },
+      returns: v.string(),
+    });
+    expectTypeOf(convexToZod(signature)).toEqualTypeOf<ZFunction<Handle>>();
+    expectTypeOf(schema).toEqualTypeOf<ZFunction<Handle>>();
+    expect(schema.parse(handle)).toBe(handle);
+    expect(schema.safeParse("tasks:run").success).toBe(false);
+    expect(zFunction().safeParse(handle).success).toBe(true);
+  });
+
+  test("zodToConvex", () => {
+    const required = zodToConvex(convexToZod(signature));
+    expectTypeOf(required).toEqualTypeOf<VFunction<Handle>>();
+    expect(required).toBe(signature);
+
+    const optional = zodToConvex(convexToZod(v.optional(signature)));
+    expectTypeOf(optional).toEqualTypeOf<
+      VFunction<Handle | undefined, "optional">
+    >();
+    expect(json(optional)).toEqual(json(signature));
+    expect(optional.isOptional).toBe("optional");
+
+    const nested = zodToConvex(convexToZod(object));
+    expect(json(nested)).toEqual(json(object));
+
+    expect(json(zodToConvex(zFunction().describe("callback")))).toEqual(
+      json(v.function()),
+    );
+  });
+
+  test("zodOutputToConvex", () => {
+    const required = zodOutputToConvex(convexToZod(signature));
+    expectTypeOf(required).toEqualTypeOf<VFunction<Handle>>();
+    expect(required).toBe(signature);
+
+    const nested = zodOutputToConvex(convexToZod(object));
+    expect(json(nested)).toEqual(json(object));
+  });
+
+  test("hand-written custom schemas are not function handles", () => {
+    const validator = zodToConvex(
+      z.custom<string>((value) => typeof value === "string"),
+    );
+    expect(json(validator)).toEqual(json(v.any()));
   });
 });

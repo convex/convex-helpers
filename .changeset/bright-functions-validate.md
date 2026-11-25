@@ -14,7 +14,6 @@ Local function-handle validation checks the `function://` prefix, as the Convex
 SDK does. Convex validates the embedded ID; function signatures are checked only
 by TypeScript.
 
-Converting a function-handle validator to Zod and back with `zodToConvex` or
-`zodOutputToConvex` yields `v.any()`, as with other custom Zod schemas. The Zod
-schema still checks the prefix, but the original Convex validator and its
-signature metadata are not preserved by that round trip.
+Add `zFunction()`, the Zod equivalent of `v.function()`, which `convexToZod`
+returns for function handles. `zodToConvex` and `zodOutputToConvex` turn it back
+into the original `v.function()` validator, signature included.
