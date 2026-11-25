@@ -30,7 +30,6 @@ import type {
   ActionBuilder,
   ArgsArrayToObject,
   DefaultFunctionArgs,
-  FunctionHandle_future,
   FunctionType,
   FunctionVisibility,
   GenericActionCtx,
@@ -370,11 +369,17 @@ function zFunctionFromValidator<Type>(
 ): ZFunction<Type> {
   const result = z.custom<Type>((value) => validate(validator, value));
   _zFunctionRegistry.add(result, { validator });
-  return result;
+  return result as ZFunction<Type>;
 }
 
+declare const zFunctionBrand: unique symbol;
+
 /** The type of {@link zFunction} validators */
-export type ZFunction<Type> = z.ZodCustom<Type, Type>;
+export type ZFunction<Type> = z.ZodCustom<Type, Type> & {
+  // Type-only, so a hand-written `z.custom()` isn't typed as `VFunction`: only
+  // `zFunction()` schemas become `v.function()` at runtime.
+  readonly [zFunctionBrand]: true;
+};
 
 /** The type of {@link zCommitTs} validators */
 export type ZCommitTs = z.ZodUnion<
@@ -1437,8 +1442,7 @@ type ConvexValidatorFromZodCommon<
                                                     : // z.custom()
                                                       Z extends zCore.$ZodCustom<any>
                                                       ? Z extends ZFunction<
-                                                          infer Type extends
-                                                            FunctionHandle_future<any>
+                                                          infer Type
                                                         >
                                                         ? VFunction<Type>
                                                         : VAny<any, "required">

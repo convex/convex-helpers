@@ -1487,8 +1487,9 @@ describe("zFunction", () => {
 
   test("hand-written custom schemas are not function handles", () => {
     const validator = zodToConvex(
-      z.custom<string>((value) => typeof value === "string"),
+      z.custom<Handle>((value) => typeof value === "string"),
     );
+    expectTypeOf(validator).not.toEqualTypeOf<VFunction<Handle>>();
     expect(json(validator)).toEqual(json(v.any()));
   });
 });
