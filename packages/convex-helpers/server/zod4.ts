@@ -2137,9 +2137,10 @@ const _zidRegistry = zCore.registry<{ tableName: string }>();
 const _zCommitTsRegistry = zCore.registry<{ commitTs: true }>();
 
 /**
- * Stores the `v.function()` validator for each {@link zFunction} schema. It's
- * typed `unknown` because registries remap metadata types, which breaks
- * `VFunction`.
+ * Stores the `v.function()` validator for each {@link zFunction} schema.
+ * Typed `unknown` because Zod's registry rewrites metadata types (to fill in
+ * `$output`/`$input` placeholders), and the rewritten `VFunction` no longer
+ * typechecks as a validator.
  */
 const _zFunctionRegistry = zCore.registry<{ validator: unknown }>();
 
