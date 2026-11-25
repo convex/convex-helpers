@@ -337,8 +337,10 @@ export const zid = <
 export const zCommitTs = (): ZCommitTs => {
   const result = z.union([z.bigint(), z.instanceof(CommitTsPlaceholder)]);
   _zCommitTsRegistry.add(result, { commitTs: true });
-  return result;
+  return result as ZCommitTs;
 };
+
+declare const zCommitTsBrand: unique symbol;
 
 /** The type of {@link zCommitTs} validators */
 export type ZCommitTs = z.ZodUnion<
@@ -347,7 +349,11 @@ export type ZCommitTs = z.ZodUnion<
     // `ZodCustom` before Zod 4.6, `ZodInstanceOf` since then
     ReturnType<typeof z.instanceof<typeof CommitTsPlaceholder>>,
   ]
->;
+> & {
+  // Type-only, so a hand-written union of the same shape isn't typed as
+  // `VCommitTs`: only `zCommitTs()` schemas become `v.commitTs()` at runtime.
+  readonly [zCommitTsBrand]: true;
+};
 
 /** The type of Convex validators in Zod */
 export type Zid<TableName extends string> = z.ZodCustom<
