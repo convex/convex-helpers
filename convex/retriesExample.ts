@@ -19,7 +19,7 @@ export const unreliableAction = internalAction({
     if (Math.random() < failureRate) {
       throw new Error("action failed.");
     }
-    console.log("action succeded.");
+    console.log("action succeeded.");
   },
 });
 
