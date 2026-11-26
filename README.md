@@ -518,7 +518,7 @@ these validators help:
    [this article](https://stack.convex.dev/using-branded-types-in-validators).
 2. A `validate(validator, data)` function validates a value against a validator.
    Warning: this does not validate that the value of v.id is an ID for the given table.
-3. Add utilties for `partial`, `pick` and `omit` to match the TypeScript type
+3. Add utilities for `partial`, `pick` and `omit` to match the TypeScript type
    utilities.
 4. Add a `doc(schema, "tableName")` helper to validate a document with system
    fields included.
