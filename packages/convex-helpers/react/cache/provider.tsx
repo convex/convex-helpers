@@ -6,7 +6,7 @@ import type {
   FunctionReference_future,
 } from "convex/server";
 import type { FC, PropsWithChildren } from "react";
-import { createContext, useMemo } from "react";
+import { createContext, useEffect, useMemo } from "react";
 
 export const ConvexQueryCacheContext = createContext({
   registry: null as CacheRegistry | null,
@@ -15,6 +15,11 @@ export const ConvexQueryCacheContext = createContext({
 /**
  * A provider that establishes a query cache context in the React render
  * tree so that cached `useQuery` calls can be used.
+ *
+ * When the provider unmounts, or its client or options change, it closes the
+ * subscriptions it holds, idle ones included, instead of leaving them open
+ * until they expire. Keying the provider (e.g. by user or organization) thus
+ * drops everything cached for the previous key at once.
  *
  * @component
  * @param {ConvexQueryCacheOptions} props.options - Options for the query cache
@@ -35,6 +40,7 @@ export const ConvexQueryCacheProvider: FC<
     () => new CacheRegistry(convex, { debug, expiration, maxIdleEntries }),
     [convex, debug, expiration, maxIdleEntries],
   );
+  useEffect(() => () => registry.clear(), [registry]);
   return (
     <ConvexQueryCacheContext.Provider value={{ registry }}>
       {children}
@@ -110,6 +116,20 @@ class CacheRegistry {
         }
       }, 3000);
     }
+  }
+
+  // Close every subscription and cancel pending evictions. The registry stays
+  // usable: under StrictMode, React runs this cleanup and then mounts the same
+  // tree again, and its queries start over. A later `end` for a cleared id
+  // finds nothing and does nothing.
+  clear() {
+    for (const entry of this.queries.values()) {
+      if (entry.evictTimer !== null) clearTimeout(entry.evictTimer);
+      entry.unsub();
+    }
+    this.queries.clear();
+    this.subs.clear();
+    this.idle = 0;
   }
 
   // Enable a new subscription.
